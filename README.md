@@ -23,7 +23,7 @@ Streamlit – For the clean, white dashboard interface.
 
 Pandas – To organize and filter the transaction data.
 
-How to run it locally:
+### How to run it locally:
 
 1. **Clone the folder:**
 \`\`\`bash
