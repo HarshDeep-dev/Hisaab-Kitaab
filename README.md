@@ -25,17 +25,25 @@ Pandas – To organize and filter the transaction data.
 
 How to run it locally:
 
-Clone the folder:
+1. **Clone the folder:**
+\`\`\`bash
 git clone https://github.com/YOUR_USERNAME/Hisaab-Kitaab.git
+\`\`\`
 
-Go into the folder:
+2. **Go into the folder:**
+\`\`\`bash
 cd "Hisaab Kitaab"
+\`\`\`
 
-Install the tools:
+3. **Install the tools:**
+\`\`\`bash
 pip install streamlit pandas plotly
+\`\`\`
 
-Start the app:
+4. **Start the app:**
+\`\`\`bash
 streamlit run app.py
+\`\`\`
 
 Why I built this:
 
