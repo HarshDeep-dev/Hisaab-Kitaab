@@ -1,4 +1,8 @@
 Hisaab Kitaab 
+
+
+
+
 Hisaab Kitaab is a simple personal finance dashboard. It's designed to help students and young professionals see all their spending—from UPI apps like GPay to shopping on Amazon—in one single place.
 
 What it does:
