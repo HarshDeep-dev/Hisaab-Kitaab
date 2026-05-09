@@ -500,6 +500,178 @@ if page == "The Pulse — Expenses":
 
     st.divider()
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SMART NUDGES — Safe-to-Spend · Burn Predictor · Food Leakage · Wealth Sweep
+    # (Additive block — no existing logic modified)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    import datetime as _dt
+
+    # ── Shared date/budget constants ──────────────────────────────────────────
+    _today        = _dt.date.today()
+    _last_day     = (_today.replace(day=28) + _dt.timedelta(days=4)).replace(day=1) - _dt.timedelta(days=1)
+    _days_left    = (_last_day - _today).days + 1
+    _total_budget = 15_000  # Monthly budget (₹)
+
+    # Current-month spends from the real data
+    _month_mask      = (
+        (expenses_df["Date"].dt.month == _today.month) &
+        (expenses_df["Date"].dt.year  == _today.year)
+    )
+    _current_spends  = expenses_df.loc[_month_mask, "Amount (₹)"].sum()
+
+    # ── CSS for Google-color nudge cards (scoped class names) ─────────────────
+    st.markdown("""
+    <style>
+        .nudge-card {
+            border-radius: 14px;
+            padding: 18px 22px;
+            margin-bottom: 10px;
+            font-size: 0.92rem;
+            line-height: 1.6;
+            border: 1.5px solid transparent;
+        }
+        .nudge-green  { background: #E6F4EA; border-color: #34A853; color: #1e4d2b; }
+        .nudge-yellow { background: #FEF9E0; border-color: #FBBC05; color: #5a4400; }
+        .nudge-red    { background: #FCE8E6; border-color: #EA4335; color: #6b1a14; }
+        .nudge-blue   { background: #E8F0FE; border-color: #4285F4; color: #1a3a6b; }
+        .nudge-label  { font-weight: 700; font-size: 0.78rem; text-transform: uppercase;
+                        letter-spacing: 0.06em; margin-bottom: 4px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("##### Smart Nudges")
+
+    nudge_c1, nudge_c2 = st.columns(2)
+
+    # ── 1. Safe-to-Spend ──────────────────────────────────────────────────────
+    with nudge_c1:
+        if _days_left > 0:
+            _safe_to_spend = (_total_budget - _current_spends) / _days_left
+            if _safe_to_spend > 500:
+                st.markdown(
+                    f'<div class="nudge-card nudge-green">'
+                    f'<div class="nudge-label">Safe to Spend Today</div>'
+                    f"You're doing great! You have <strong>₹{int(_safe_to_spend):,}</strong> "
+                    f"safe to spend today without overshooting your monthly budget."
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f'<div class="nudge-card nudge-yellow">'
+                    f'<div class="nudge-label">Safe to Spend Today</div>'
+                    f"Careful! Your safe limit for today is only <strong>₹{int(_safe_to_spend):,}</strong>. "
+                    f"Tighten up to stay within budget."
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.markdown(
+                '<div class="nudge-card nudge-blue">'
+                '<div class="nudge-label">Safe to Spend Today</div>'
+                "Last day of the month — spend mindfully!"
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+    # ── 2. Month-End Burn Predictor ───────────────────────────────────────────
+    with nudge_c2:
+        _current_day      = _today.day
+        _burn_rate        = _current_spends / max(_current_day, 1)
+        _predicted_total  = _burn_rate * _last_day.day
+
+        if _predicted_total > _total_budget:
+            _deficit = _predicted_total - _total_budget
+            st.markdown(
+                f'<div class="nudge-card nudge-red">'
+                f'<div class="nudge-label">Month-End Burn Predictor</div>'
+                f"At this burn rate you'll <strong>overspend by ₹{int(_deficit):,}</strong> "
+                f"by month-end. Try cutting down on Zomato or impulse shopping!"
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            _projected_saving = _total_budget - _predicted_total
+            st.markdown(
+                f'<div class="nudge-card nudge-green">'
+                f'<div class="nudge-label">Month-End Burn Predictor</div>'
+                f"Trend looks good! You are projected to <strong>save ₹{int(_projected_saving):,}</strong> "
+                f"by month-end at your current pace."
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    nudge_c3, nudge_c4 = st.columns(2)
+
+    # ── 3. Zomato/Swiggy Leakage Alert ───────────────────────────────────────
+    with nudge_c3:
+        _food_df      = expenses_df[expenses_df["Merchant"].isin(["Zomato", "Swiggy"])]
+        _food_df      = _food_df.copy()
+        _food_df["Week"] = _food_df["Date"].dt.isocalendar().week
+
+        _this_week_num  = _dt.date.today().isocalendar()[1]
+        _this_week_amt  = _food_df[_food_df["Week"] == _this_week_num]["Amount (₹)"].sum()
+        _past_weeks     = _food_df[_food_df["Week"] < _this_week_num]
+
+        if not _past_weeks.empty:
+            _weekly_avg = _past_weeks.groupby("Week")["Amount (₹)"].sum().tail(3).mean()
+        else:
+            _weekly_avg = _this_week_amt  # fallback: no prior data
+
+        if _weekly_avg > 0 and _this_week_amt > (_weekly_avg * 1.2):
+            _spike_pct = int((_this_week_amt / _weekly_avg - 1) * 100)
+            st.markdown(
+                f'<div class="nudge-card nudge-yellow">'
+                f'<div class="nudge-label">Food Delivery Leakage</div>'
+                f"Your <strong>Zomato/Swiggy</strong> spend has spiked "
+                f"<strong>{_spike_pct}%</strong> this week "
+                f"(₹{int(_this_week_amt):,} vs avg ₹{int(_weekly_avg):,}). "
+                f"Consider cooking at home to plug the leak."
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                f'<div class="nudge-card nudge-green">'
+                f'<div class="nudge-label">Food Delivery Leakage</div>'
+                f"Food delivery spend looks normal this week "
+                f"(₹{int(_this_week_amt):,}). Keep it up!"
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+    # ── 4. Wealth-First Sweep ─────────────────────────────────────────────────
+    with nudge_c4:
+        _expected_daily = _total_budget / _last_day.day
+        if _days_left > 0:
+            _safe_to_spend_sweep = (_total_budget - _current_spends) / _days_left
+            _surplus             = _safe_to_spend_sweep - _expected_daily
+        else:
+            _surplus = 0
+
+        if _surplus > 200:
+            st.markdown(
+                f'<div class="nudge-card nudge-blue">'
+                f'<div class="nudge-label">Smart Save Suggestion</div>'
+                f"You've been spending below your daily target — "
+                f"move <strong>₹{int(_surplus):,}</strong> to your SIP or "
+                f"Gold Vault and let it compound!"
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="nudge-card nudge-blue">'
+                '<div class="nudge-label">Smart Save Suggestion</div>'
+                "Keep spending in check for a few more days to unlock a "
+                "<strong>Wealth Sweep</strong> suggestion."
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.divider()
+
     # ── Charts ────────────────────────────────────────────────────────────────
     chart_col, table_col = st.columns([1, 1])
 
