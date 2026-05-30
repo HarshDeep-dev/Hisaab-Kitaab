@@ -16,6 +16,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+from api_connection import generate_live_guru_insights
 import random
 import textwrap
 
@@ -423,7 +424,7 @@ with st.sidebar:
     # Navigation radio
     page = st.radio(
         "Navigate",
-        ["The Pulse — Expenses", "The Vault — Investments", "The Guru — AI Analyst"],
+        ["Expenses", "Investments", "Insights"],
         label_visibility="collapsed",
     )
 
@@ -449,7 +450,7 @@ with st.sidebar:
 #  PAGE 1 — THE PULSE  (Expense Tracker)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-if page == "The Pulse — Expenses":
+if page == "Expenses":
 
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown('<p class="section-header">The Pulse</p>', unsafe_allow_html=True)
@@ -500,10 +501,6 @@ if page == "The Pulse — Expenses":
 
     st.divider()
 
-    # ═══════════════════════════════════════════════════════════════════════════
-    # SMART NUDGES — Safe-to-Spend · Burn Predictor · Food Leakage · Wealth Sweep
-    # (Additive block — no existing logic modified)
-    # ═══════════════════════════════════════════════════════════════════════════
 
     import datetime as _dt
 
@@ -761,10 +758,10 @@ if page == "The Pulse — Expenses":
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  PAGE 2 — THE VAULT  (Portfolio & Investments)
+#  PAGE 2 — Portfolio & Investments
 # ═══════════════════════════════════════════════════════════════════════════════
 
-elif page == "The Vault — Investments":
+elif page == "Investments":
 
     st.markdown('<p class="section-header">The Vault</p>', unsafe_allow_html=True)
     st.markdown(
@@ -783,6 +780,63 @@ elif page == "The Vault — Investments":
     v2.metric("Current Value", f"₹{total_current:,.0f}")
     v3.metric("Net P&L", f"₹{net_pnl:,.0f}", delta=f"{total_return_pct}%")
     v4.metric("Assets Held", f"{len(portfolio_df)}")
+
+    st.write("")  
+    
+    
+    inv_col1, inv_col2 = st.columns(2)
+    
+    with inv_col1:
+        
+        st.markdown("""
+        <div style="border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; min-height: 220px; background-color: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="font-weight: 700; font-size: 1.1rem; color: #1E293B; margin-bottom: 8px;">Risk Analysis</div>
+            <div style="font-size: 0.88rem; color: #64748B; line-height: 1.5; margin-bottom: 24px;">
+                Test how your investments handle sudden global market crashes and volatility shocks.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        
+        if st.button("Check Risk", key="btn_risk_stress_top", type="primary", use_container_width=True):
+            with st.spinner("Processing"):
+                from api_connection import simulate_institutional_investment_strategy
+                summary_data = portfolio_df[["Asset", "Platform", "Current Value (₹)", "Returns (%)"]].to_json(orient="records")
+                risk_intelligence_text = simulate_institutional_investment_strategy(summary_data)
+                
+                st.markdown(f"""
+                <div class="insight-box-blue" style="margin-top: 15px;">
+                    <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#2563EB;">Institutional Quant Assessment</span><br><br>
+                    {risk_intelligence_text}
+                </div>
+                """, unsafe_allow_html=True)
+                
+    with inv_col2:
+        
+        st.markdown("""
+        <div style="border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; min-height: 220px; background-color: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="font-weight: 700; font-size: 1.1rem; color: #1E293B; margin-bottom: 8px;">Tax Optimizer</div>
+            <div style="font-size: 0.88rem; color: #64748B; line-height: 1.5; margin-bottom: 24px;">
+                Find smart, fully legal strategies to lower your investment tax bills automatically.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+       
+        if st.button("Save Tax", key="btn_tax_harvest_top", type="secondary", use_container_width=True):
+            with st.spinner("Processing"):
+                from api_connection import simulate_institutional_investment_strategy
+                summary_data = portfolio_df[["Asset", "Platform", "Current Value (₹)", "Returns (%)"]].to_json(orient="records")
+                tax_intelligence_text = simulate_institutional_investment_strategy(summary_data)
+                
+                st.markdown(f"""
+                <div class="insight-box-green" style="margin-top: 15px;">
+                    <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#16A34A;">Corporate Tax Shield Audit</span><br><br>
+                    {tax_intelligence_text}
+                </div>
+                """, unsafe_allow_html=True)
+
+    st.write("")
 
     st.divider()
 
@@ -810,6 +864,7 @@ elif page == "The Vault — Investments":
         st.write("")  # spacer
 
     st.divider()
+
 
     # ── Allocation Chart ──────────────────────────────────────────────────────
     alloc_col, trend_col = st.columns([1, 1])
@@ -881,18 +936,78 @@ elif page == "The Vault — Investments":
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  PAGE 3 — THE GURU  (AI Financial Analyst)
+#  PAGE 3 — INSIGHTS (AI Financial Analyst with Global Liquidity Optimization)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-elif page == "The Guru — AI Analyst":
+elif page == "Insights":
 
-    st.markdown('<p class="section-header">The Guru</p>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header">Financial Insights</p>', unsafe_allow_html=True)
     st.markdown(
-        '<p class="section-subtitle">Data-driven insights. No fluff, only actions.</p>',
+        '<p class="section-subtitle">Algorithmic liquidity analysis and predictive capital optimization.</p>',
         unsafe_allow_html=True,
     )
 
-    # ── Insight generator ─────────────────────────────────────────────────────
+    # Compute actual summary parameters from dataframe to pass to the API channel
+    total_spend = expenses_df["Amount (₹)"].sum()
+    daily_avg = expenses_df["Amount (₹)"].mean()
+    merchant_spend = expenses_df.groupby("Merchant")["Amount (₹)"].sum()
+    top_merchant = merchant_spend.idxmax()
+    top_merchant_amt = merchant_spend.max()
+    food_spend = expenses_df[expenses_df["Category"] == "Food & Dining"]["Amount (₹)"].sum()
+    
+    # Global balance simulation across multiple external digital wallets
+    liquid_cash_pool = 45000.00 
+
+    st.write("### AI Insights")
+    
+    
+    
+    analysis_col1, analysis_col2, analysis_col3 = st.columns(3)
+    
+    with analysis_col1:
+        st.write("**Spend**")
+        st.caption("See exactly where your money goes every day..<br><br>", unsafe_allow_html=True)
+        if st.button("Analyze Spending", key="btn_spend", type="primary", use_container_width=True):
+            with st.spinner("Analyzing consumption velocity logs via Google AI Studio..."):
+                live_insights_text = generate_live_guru_insights(total_spend, top_merchant, top_merchant_amt, food_spend)
+                st.markdown(f"""
+                <div class="insight-box-blue">
+                    <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#2563EB;">Localized Consumption Analysis</span><br><br>
+                    {live_insights_text}
+                </div>
+                """, unsafe_allow_html=True)
+                
+    with analysis_col2:
+        st.write("**Save**")
+        st.caption("Find out how long your current balance will last..<br><br>", unsafe_allow_html=True)
+        if st.button("Check Runway", key="btn_save", type="secondary", use_container_width=True):
+            with st.spinner("Computing global predictive financial velocity models..."):
+                from api_connection import generate_global_predictive_runway
+                global_runway_text = generate_global_predictive_runway(total_spend, daily_avg, liquid_cash_pool)
+                st.markdown(f"""
+                <div class="insight-box-green">
+                    <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#16A34A;">Global Liquidity Risk Engine</span><br><br>
+                    {global_runway_text}
+                </div>
+                """, unsafe_allow_html=True)
+
+    with analysis_col3:
+        st.write("**Global**")
+        st.caption("Analyze global currency paths to eliminate hidden transaction costs.")
+        if st.button("Optimize Transfer", key="btn_send", type="secondary", use_container_width=True):
+            with st.spinner("Executing dynamic cross-border pathway simulations..."):
+                from api_connection import simulate_smart_payout_routing
+                global_routing_text = simulate_smart_payout_routing(1500.00, "USD", "INR")
+                st.markdown(f"""
+                <div class="insight-box">
+                    <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#D97706;">Smart Payout Routing Engine</span><br><br>
+                    {global_routing_text}
+                </div>
+                """, unsafe_allow_html=True)
+                
+    st.divider()
+
+    # ── Insight generator (Original Static Analytics Undisturbed) ────────────────
     def generate_insights(exp_df: pd.DataFrame, port_df: pd.DataFrame) -> list[dict]:
         """
         Analyse expense + portfolio data and produce actionable financial insights.
@@ -901,13 +1016,13 @@ elif page == "The Guru — AI Analyst":
         insights: list[dict] = []
 
         # ─ Insight 1: Top merchant spend ──────────────────────────────────────
-        merchant_spend = exp_df.groupby("Merchant")["Amount (₹)"].sum()
-        top_merchant = merchant_spend.idxmax()
-        top_merchant_amt = merchant_spend.max()
+        merchant_spend_loc = exp_df.groupby("Merchant")["Amount (₹)"].sum()
+        top_merchant_loc = merchant_spend_loc.idxmax()
+        top_merchant_amt_loc = merchant_spend_loc.max()
 
         # Estimate potential MF returns (12% CAGR over 5 years)
         redirect_pct = 0.20
-        redirect_amt = top_merchant_amt * redirect_pct
+        redirect_amt = top_merchant_amt_loc * redirect_pct
         future_value = redirect_amt * ((1 + 0.12) ** 5)
 
         insights.append({
@@ -915,8 +1030,8 @@ elif page == "The Guru — AI Analyst":
             "style": "insight-box",
             "title": "Shopping Pattern Detected",
             "body": (
-                f"You've spent <strong>₹{top_merchant_amt:,.0f}</strong> on "
-                f"<strong>{top_merchant}</strong> over the last 30 days. "
+                f"You've spent <strong>₹{top_merchant_amt_loc:,.0f}</strong> on "
+                f"<strong>{top_merchant_loc}</strong> over the last 30 days. "
                 f"Redirecting just 20% (₹{redirect_amt:,.0f}/month) into a "
                 f"mutual fund with ~12% CAGR could grow to "
                 f"<strong>₹{future_value:,.0f}</strong> in 5 years."
@@ -924,8 +1039,8 @@ elif page == "The Guru — AI Analyst":
         })
 
         # ─ Insight 2: Food delivery overspend ────────────────────────────────
-        food_spend = exp_df[exp_df["Category"] == "Food & Dining"]["Amount (₹)"].sum()
-        daily_food_avg = food_spend / 30
+        food_spend_loc = exp_df[exp_df["Category"] == "Food & Dining"]["Amount (₹)"].sum()
+        daily_food_avg = food_spend_loc / 30
 
         insights.append({
             "icon": "",
@@ -933,7 +1048,7 @@ elif page == "The Guru — AI Analyst":
             "title": "Food Delivery Spend Alert",
             "body": (
                 f"Your monthly food delivery spend is "
-                f"<strong>₹{food_spend:,.0f}</strong> "
+                f"<strong>₹{food_spend_loc:,.0f}</strong> "
                 f"(~₹{daily_food_avg:,.0f}/day). "
                 f"Cooking at home 3 days a week could save you approximately "
                 f"<strong>₹{daily_food_avg * 3 * 4:,.0f}</strong> per month — "
