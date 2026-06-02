@@ -356,21 +356,20 @@ with st.sidebar:
     for label, display_text in menu_options:
         is_active = (page == label)
         
-        # If active, we render an empty container and style it or use st.html/classes if supported, 
-        # or we can write a single clean click capture line:
+        
         if is_active:
-            # We use markdown containing a small hidden tracking style script to force the active pill color class onto this button dynamically
+
             st.markdown(f'<style>button[key*="nav_btn_{label}"] {{ background-color: #c9ddff !important; color: #0b192c !important; font-weight: 600 !important; }}</style>', unsafe_allow_html=True)
             
         if st.button(display_text, key=f"nav_btn_{label}", use_container_width=True):
             st.session_state.active_page = label
             st.rerun()
 
-    # Clear structural spacer blocks
+    
     for _ in range(6):
         st.write("")
 
-    # ── Bottom Primary Call to Action Button ──
+    
     if st.button("＋ New Transaction", key="sidebar_new_txn_cta", use_container_width=True):
         st.toast("Initialization of transaction container ledger session...")
         
@@ -468,29 +467,56 @@ if page == "Dashboard":
         """, unsafe_allow_html=True)
 
     with chart_row_c2:
-        st.markdown("""
-            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; min-height: 380px;">
-                <h3 style="font-family: 'Geist'; font-size: 18px; font-weight: 600; color: #1b1b1b; margin-top: 0; margin-bottom: 12px;">Portfolio Performance</h3>
-            </div>
-        """, unsafe_allow_html=True)
-        
+        # High-density mock data setup to replicate your target design scale perfectly
         perf_data = pd.DataFrame({
             "Timeline": ["Oct '22", "Jan '23", "Apr '23", "Jul '23", "Current"],
-            "Valuation ($)": [420000, 480000, 510000, 680000, 1482904]
+            "Valuation (₹)": [420000, 480000, 510000, 680000, 1482904]
         })
         
-        fig_perf = px.bar(perf_data, x="Timeline", y="Valuation ($)", color_discrete_sequence=["#2563eb"])
-        fig_perf.update_layout(
-            margin=dict(t=10, b=10, l=10, r=10),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(showgrid=False, title=""),
-            yaxis=dict(showgrid=True, gridcolor="#f1f5f9", title=""),
-            font=dict(family="Inter", color="#1b1b1b"),
-            height=280
+        # Initialize native bar object
+        fig_perf = px.bar(
+            perf_data, 
+            x="Timeline", 
+            y="Valuation (₹)", 
+            color_discrete_sequence=["#2563eb"] 
         )
-        fig_perf.update_traces(marker_cornerradius=4)
+        
+        
+        fig_perf.update_layout(
+            title=dict(
+                text="<b>Portfolio Performance</b>",
+                font=dict(family="Geist, Inter, sans-serif", size=18, color="#1b1b1b"),
+                pad=dict(l=10, t=15)
+            ),
+            margin=dict(t=70, b=20, l=20, r=20), 
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+            xaxis=dict(
+                showgrid=False, 
+                title="", 
+                tickfont=dict(family="Inter", color="#505f76", size=12)
+            ),
+            yaxis=dict(
+                showgrid=True, 
+                gridcolor="#f1f5f9", 
+                title="", 
+                showticklabels=True,
+                tickfont=dict(family="Inter", color="#505f76", size=11)
+            ),
+            height=420, # Matches the exact container pixel height boundary of the adjacent Asset box
+            showlegend=False
+        )
+        
+        # Apply pristine corner roundings to chart layout columns
+        fig_perf.update_traces(
+            marker_cornerradius=4,
+            width=0.55 
+        )
+        
+        # Inject custom CSS layout framing wrapper directly into the native chart rendering engine wrapper
+        st.markdown('<div style="border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff; overflow: hidden;">', unsafe_allow_html=True)
         st.plotly_chart(fig_perf, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE 2 — ASSETS
