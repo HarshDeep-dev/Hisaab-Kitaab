@@ -1,24 +1,17 @@
-"""
-╔══════════════════════════════════════════════════════════════════╗
-║                      हिसाब किताब                                  ║
-║              Personal Finance Analytics Dashboard                ║
-║                                                                  ║
-║  A sleek, light-themed expense & investment tracker built        ║
-║  with Streamlit, Pandas, and Plotly. Generates realistic        ║
-║  mock data — no external APIs required.                         ║
-╚══════════════════════════════════════════════════════════════════╝
-"""
-
-# ─── Imports ────────────────────────────────────────────────────────────────────
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
 from datetime import datetime, timedelta
-from api_connection import generate_live_guru_insights
 import random
-import textwrap
+
+# ─── API & LLM Logic Framework Connections ─────────────────────────────────────
+from api_connection import (
+    generate_live_guru_insights,
+    generate_global_predictive_runway,
+    simulate_smart_payout_routing,
+    simulate_institutional_investment_strategy
+)
 
 # ─── Page Configuration ────────────────────────────────────────────────────────
 st.set_page_config(
@@ -28,1156 +21,1130 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Initialize Session State values for AI models if they don't exist
+if "ai_spend_cache" not in st.session_state:
+    st.session_state.ai_spend_cache = None
+if "ai_runway_cache" not in st.session_state:
+    st.session_state.ai_runway_cache = None
+if "ai_global_cache" not in st.session_state:
+    st.session_state.ai_global_cache = None
+
+# Track the active navigation page state dynamically
+if "active_page" not in st.session_state:
+    st.session_state.active_page = "Dashboard"
+
 # ─── Custom CSS: Light Fintech Theme ───────────────────────────────────────────
 st.markdown("""
-<style>
-    /* ── Global overrides ─────────────────────────────────────────────────── */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Geist:wght@100..900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+            
+    
+    <style>
+            
+        /* ─── EXACT REPLICA SIDEBAR TERMINAL SYSTEM ─── */
+        /* Completely hide any lingering native radio containers if present */
+        div[data-testid="stSidebarNav"] {
+            display: none !important;
+        }
+            
+        /* ─── PREMIUM INSTITUTIONAL NAVIGATION SELECTORS ─── */
+        div[data-testid="stSidebar"] div.stButton > button {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            gap: 12px !important;
+            padding: 12px 16px !important;
+            border-radius: 8px !important;
+            border: 1px solid transparent !important;
+            width: 100% !important;
+            height: 44px !important;
+            
+            /* ── TYPOGRAPHY UPGRADES ── */
+            font-family: 'Geist', 'Inter', sans-serif !important; /* Uses premium Geist stack if loaded */
+            font-size: 14px !important;
+            font-weight: 600 !important; /* Makes the text strictly bold */
+            letter-spacing: -0.01em !important; /* Tightens tracking for a modern look */
+            
+            background-color: transparent !important;
+            color: #94a3b8 !important; /* Muted Slate-Gray */
+            transition: all 0.2s ease-in-out !important;
+            text-align: left !important;
+            margin-bottom: 4px !important;
+        }
 
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
+        /* Hover states for unselected buttons */
+        div[data-testid="stSidebar"] div.stButton > button:hover {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            color: #ffffff !important;
+            border-color: transparent !important;
+        }
 
-    /* Force light background everywhere */
-    .stApp {
-        background-color: #FFFFFF;
-    }
+        /* Target the active selected page button */
+        div[data-testid="stSidebar"] div.stButton > button.active-nav-pill {
+            background-color: #c9ddff !important;
+            color: #0b192c !important;
+            font-weight: 700 !important; /* Extra bold text when selected */
+            border-color: transparent !important;
+        }
 
-    /* ── Sidebar styling ──────────────────────────────────────────────────── */
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #F8FAFC 0%, #EFF6FF 100%);
-        border-right: 1px solid #E2E8F0;
-    }
+        /* Styling for the custom navigation item links */
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: #94a3b8 !important; /* Muted Slate-Gray */
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            margin-bottom: 4px;
+            transition: all 0.2s ease;
+            background: transparent;
+            border: none;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+        }
 
-    section[data-testid="stSidebar"] .stMarkdown h1 {
-        font-size: 1.35rem;
-        font-weight: 700;
-        color: #0F172A;
-    }
+        /* Hover animation properties */
+        .nav-item:hover {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            color: #ffffff !important;
+        }
 
-    /* ── Metric card styling ──────────────────────────────────────────────── */
-    div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 60%, #DBEAFE 100%);
-        border: 1px solid #CBD5E1;
-        border-radius: 14px;
-        padding: 20px 24px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
+        /* The exact Light Blue Active Pill state from your target image */
+        .nav-item-active {
+            background-color: #c9ddff !important; /* Soft Light Blue Background */
+            color: #0b192c !important; /* Premium Dark Font */
+            font-weight: 600;
+        }
 
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.10);
-    }
+        /* Material Icons sizing alignment inside the link row */
+        .nav-icon {
+            font-family: 'Material Symbols Outlined';
+            font-size: 20px;
+            font-weight: 300;
+            flex-shrink: 0;
+        }
 
-    div[data-testid="stMetric"] label {
-        color: #64748B !important;
-        font-weight: 500;
-        font-size: 0.8rem;
-        letter-spacing: 0.025em;
-        text-transform: uppercase;
-    }
+        /* Active action icon override color change matching the text */
+        .nav-item-active .nav-icon {
+            color: #0b192c !important;
+            font-weight: 400;
+        }
+            
+        /* ── Root Application Canvas Reset ── */
+        .stApp {
+            background-color: #f9f9f9 !important;
+            color: #1b1b1b !important;
+            font-family: 'Inter', sans-serif !important;
+        }
 
-    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
-        color: #0F172A !important;
-        font-weight: 700;
-        font-size: 1.6rem;
-    }
+        .block-container {
+            max-width: 1160px !important;
+            padding-left: 32px !important;
+            padding-right: 32px !important;
+            padding-top: 1.5rem !important;
+        }
 
-    /* ── Tab styling ──────────────────────────────────────────────────────── */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background: #F8FAFC;
-        border-radius: 12px;
-        padding: 4px;
-        border: 1px solid #E2E8F0;
-    }
+        /* ── Absolute Transparency for Streamlit Header Elements ── */
+        header[data-testid="stHeader"] {
+            background-color: rgba(0, 0, 0, 0) !important;
+            border-bottom: none !important;
+            z-index: 99 !important;
+        }
 
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 8px;
-        padding: 10px 24px;
-        font-weight: 500;
-        font-size: 0.9rem;
-        color: #64748B;
-    }
+        /* ── High-Density Dark Terminal Sidebar Overrides ── */
+        section[data-testid="stSidebar"] {
+            background-color: #0f172a !important;
+            border-right: 1px solid #1e293b !important;
+        }
 
-    .stTabs [aria-selected="true"] {
-        background: #2563EB !important;
-        color: #FFFFFF !important;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
-    }
+        /* ── Fix Sidebar Navigation Text Colors ── */
+        section[data-testid="stSidebar"] .stRadio p {
+            color: #b8c7e2 !important; 
+            font-family: 'Geist', sans-serif !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.08em !important;
+        }
+            
+            /* ── PERFECT SIDEBAR NAVIGATION FIX ── */
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] [role="radio"] > div:first-child {
+            display: none !important;
+        }
 
-    /* ── Dataframe / table styling ────────────────────────────────────────── */
-    .stDataFrame {
-        border: 1px solid #E2E8F0;
-        border-radius: 12px;
-        overflow: hidden;
-    }
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] [role="radio"] {
+            padding: 12px 16px !important;
+            border-radius: 8px !important;
+            margin-bottom: 4px !important;
+            width: 100% !important;
+            transition: all 0.2s ease !important;
+            background-color: transparent !important;
+            cursor: pointer !important;
+        }
 
-    /* ── Divider ──────────────────────────────────────────────────────────── */
-    hr {
-        border: none;
-        border-top: 1px solid #E2E8F0;
-        margin: 1.5rem 0;
-    }
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] [role="radio"]:hover {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+        }
 
-    /* ── Alert boxes ──────────────────────────────────────────────────────── */
-    .stAlert {
-        border-radius: 12px;
-    }
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] [aria-checked="true"] {
+            background-color: #1e293b !important;
+        }
 
-    /* ── Headline badge ───────────────────────────────────────────────────── */
-    .headline-card {
-        background: #F8FAFC;
-        border-left: 4px solid #2563EB;
-        border-radius: 0 10px 10px 0;
-        padding: 14px 20px;
-        margin-bottom: 12px;
-        color: #334155;
-        font-size: 0.92rem;
-        line-height: 1.55;
-    }
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] p {
+            color: #505f76 !important;
+            font-family: 'Inter', sans-serif !important;
+            font-size: 14px !important;
+            font-weight: 500 !important;
+            margin: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+        }
 
-    .headline-card strong {
-        color: #0F172A;
-    }
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] [aria-checked="true"] p {
+            color: #ffffff !important;
+            font-weight: 600 !important;
+        }
 
-    /* ── Section headers ──────────────────────────────────────────────────── */
-    .section-header {
-        font-size: 1.15rem;
-        font-weight: 700;
-        color: #0F172A;
-        margin-bottom: 4px;
-        letter-spacing: -0.01em;
-    }
+        /* Inject Material Icons via CSS safe content strings */
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] p::before {
+            font-family: 'Material Symbols Outlined' !important;
+            font-size: 20px !important;
+            font-weight: 300 !important;
+        }
+        
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] [role="radio"]:nth-child(1) p::before { content: 'grid_view'; }
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] [role="radio"]:nth-child(2) p::before { content: 'account_balance_wallet'; }
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] [role="radio"]:nth-child(3) p::before { content: 'account_balance'; }
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] [role="radio"]:nth-child(4) p::before { content: 'bar_chart'; }
+        [data-testid="stSidebar"] .stRadio [role="radiogroup"] [role="radio"]:nth-child(5) p::before { content: 'shield'; }
+        section[data-testid="stSidebar"] div[role="radiogroup"] > div[aria-checked="true"] p {
+            color: #ffffff !important;
+            font-weight: 800 !important;
+        }
 
-    .section-subtitle {
-        font-size: 0.82rem;
-        color: #94A3B8;
-        font-weight: 400;
-        margin-bottom: 18px;
-    }
+        section[data-testid="stSidebar"] div[role="radiogroup"] div[role="radio"] div:first-child {
+            display: none !important;
+        }
+        
+        section[data-testid="stSidebar"] div[role="radiogroup"] div[role="radio"] {
+            padding: 8px 12px !important;
+            margin-bottom: 4px !important;
+            border-radius: 6px !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        section[data-testid="stSidebar"] div[role="radiogroup"] div[role="radio"]:hover {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+        }
 
-    /* ── Sidebar brand ────────────────────────────────────────────────────── */
-    .brand-title {
-        font-size: 1.5rem;
-        font-weight: 800;
-        background: linear-gradient(135deg, #2563EB, #7C3AED);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        letter-spacing: -0.02em;
-        margin-bottom: 2px;
-    }
+        /* ── Flat Structural Metrics Grid Architecture ── */
+        div[data-testid="stMetric"] {
+            background-color: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            padding: 20px !important;
+            box-shadow: none !important;
+        }
 
-    .brand-sub {
-        font-size: 0.75rem;
-        color: #94A3B8;
-        font-weight: 400;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        margin-bottom: 24px;
-    }
+        div[data-testid="stMetric"] label {
+            font-family: 'Geist', sans-serif !important;
+            color: #505f76 !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+        }
 
-    /* ── Portfolio card ────────────────────────────────────────────────────── */
-    .portfolio-card {
-        background: linear-gradient(135deg, #F8FAFC, #EFF6FF);
-        border: 1px solid #E2E8F0;
-        border-radius: 14px;
-        padding: 22px;
-        text-align: center;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
+        div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+            font-family: 'Geist', sans-serif !important;
+            color: #1b1b1b !important;
+            font-weight: 600 !important;
+            font-size: 26px !important;
+            letter-spacing: -0.02em !important;
+        }
 
-    .portfolio-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.08);
-    }
+        div.stButton > button {
+            border-radius: 9999px !important;
+            font-family: 'Geist', sans-serif !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            transition: all 0.15s ease-in-out !important;
+        }
 
-    .portfolio-label {
-        font-size: 0.72rem;
-        color: #94A3B8;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        font-weight: 600;
-        margin-bottom: 4px;
-    }
+        div.stButton > button[kind="primary"] {
+            background-color: #000000 !important;
+            border: 1px solid #000000 !important;
+            color: #ffffff !important;
+        }
 
-    .portfolio-value {
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: #0F172A;
-    }
-
-    .portfolio-return-positive {
-        color: #16A34A;
-        font-weight: 600;
-        font-size: 0.95rem;
-    }
-
-    .portfolio-return-negative {
-        color: #DC2626;
-        font-weight: 600;
-        font-size: 0.95rem;
-    }
-
-    /* ── Insight box ──────────────────────────────────────────────────────── */
-    .insight-box {
-        background: linear-gradient(135deg, #FFFBEB, #FEF3C7);
-        border: 1px solid #FCD34D;
-        border-radius: 12px;
-        padding: 18px 22px;
-        margin-bottom: 14px;
-        line-height: 1.6;
-    }
-
-    .insight-box-blue {
-        background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
-        border: 1px solid #93C5FD;
-        border-radius: 12px;
-        padding: 18px 22px;
-        margin-bottom: 14px;
-        line-height: 1.6;
-    }
-
-    .insight-box-green {
-        background: linear-gradient(135deg, #F0FDF4, #DCFCE7);
-        border: 1px solid #86EFAC;
-        border-radius: 12px;
-        padding: 18px 22px;
-        margin-bottom: 14px;
-        line-height: 1.6;
-    }
-
-    .insight-icon {
-        font-size: 1.3rem;
-        margin-right: 8px;
-    }
-
-    /* ── Footer ───────────────────────────────────────────────────────────── */
-    .footer {
-        text-align: center;
-        color: #CBD5E1;
-        font-size: 0.72rem;
-        margin-top: 3rem;
-        padding: 1rem 0;
-        border-top: 1px solid #F1F5F9;
-        letter-spacing: 0.04em;
-    }
-</style>
+        div.stButton > button[kind="secondary"] {
+            background-color: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            color: #1b1b1b !important;
+        }
+    </style>
 """, unsafe_allow_html=True)
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
-# DATA GENERATION — deterministic seed for reproducibility within a session
+# DATA GENERATION
 # ═══════════════════════════════════════════════════════════════════════════════
-
 @st.cache_data
 def generate_expense_data() -> pd.DataFrame:
-    """
-    Synthesise 30 days of realistic Indian expense data.
-    Merchant ↔ Category mapping keeps the data believable.
-    """
     np.random.seed(42)
     random.seed(42)
-
-    merchant_category_map = {
-        "Zomato": "Food & Dining",
-        "Swiggy": "Food & Dining",
-        "Amazon": "Shopping",
-        "Flipkart": "Shopping",
-        "Myntra": "Shopping",
-        "PhonePe Transfer": "Transfers",
-        "Google Pay Transfer": "Transfers",
-        "Jio Recharge": "Bills & Utilities",
-        "Airtel Recharge": "Bills & Utilities",
-        "Electricity Board": "Bills & Utilities",
-        "Uber": "Transport",
-        "Ola": "Transport",
-        "Netflix": "Entertainment",
-        "Spotify": "Entertainment",
-        "BookMyShow": "Entertainment",
-        "Apollo Pharmacy": "Health",
-        "BigBasket": "Groceries",
-        "Blinkit": "Groceries",
-        "Zepto": "Groceries",
-        "DMart": "Groceries",
-    }
-
-    merchants = list(merchant_category_map.keys())
+    merchants = ["Zomato", "Swiggy", "Amazon", "PhonePe Transfer", "Jio Recharge", "Uber", "Netflix"]
     today = datetime.now().date()
     records = []
-
     for day_offset in range(30):
-        date = today - timedelta(days=day_offset)
-        # 2-6 transactions per day
-        n_txns = random.randint(2, 6)
-        for _ in range(n_txns):
-            merchant = random.choice(merchants)
-            category = merchant_category_map[merchant]
-
-            # Realistic amount ranges per category
-            amount_ranges = {
-                "Food & Dining": (80, 750),
-                "Shopping": (250, 5000),
-                "Transfers": (100, 3000),
-                "Bills & Utilities": (100, 2500),
-                "Transport": (60, 500),
-                "Entertainment": (99, 999),
-                "Health": (50, 1500),
-                "Groceries": (120, 2000),
-            }
-            lo, hi = amount_ranges[category]
-            amount = round(random.uniform(lo, hi), 2)
-
+        for _ in range(random.randint(2, 6)):
             records.append({
-                "Date": date,
-                "Merchant": merchant,
-                "Category": category,
-                "Amount (₹)": amount,
+                "Date": today - timedelta(days=day_offset),
+                "Merchant": random.choice(merchants),
+                "Category": "General",
+                "Amount (₹)": round(random.uniform(50, 3000), 2),
             })
-
     df = pd.DataFrame(records)
     df["Date"] = pd.to_datetime(df["Date"])
-    df = df.sort_values("Date", ascending=False).reset_index(drop=True)
-    return df
-
+    return df.sort_values("Date", ascending=False).reset_index(drop=True)
 
 @st.cache_data
 def generate_portfolio_data() -> pd.DataFrame:
-    """
-    Build a realistic Indian retail-investor portfolio with mixed asset classes.
-    """
-    np.random.seed(42)
     portfolio = [
-        {
-            "Asset": "Reliance Industries",
-            "Platform": "Upstox (Stocks)",
-            "Invested (₹)": 75_000,
-            "Current Value (₹)": 91_350,
-        },
-        {
-            "Asset": "HDFC Bank",
-            "Platform": "Upstox (Stocks)",
-            "Invested (₹)": 50_000,
-            "Current Value (₹)": 54_200,
-        },
-        {
-            "Asset": "Tata Motors",
-            "Platform": "Upstox (Stocks)",
-            "Invested (₹)": 30_000,
-            "Current Value (₹)": 38_700,
-        },
-        {
-            "Asset": "Axis Bluechip Fund",
-            "Platform": "Zerodha (Mutual Funds)",
-            "Invested (₹)": 1_00_000,
-            "Current Value (₹)": 1_18_400,
-        },
-        {
-            "Asset": "SBI Small Cap Fund",
-            "Platform": "Zerodha (Mutual Funds)",
-            "Invested (₹)": 60_000,
-            "Current Value (₹)": 73_800,
-        },
-        {
-            "Asset": "Parag Parikh Flexi Cap",
-            "Platform": "Zerodha (Mutual Funds)",
-            "Invested (₹)": 80_000,
-            "Current Value (₹)": 97_600,
-        },
-        {
-            "Asset": "SBI 1-Year FD",
-            "Platform": "Bank FD",
-            "Invested (₹)": 2_00_000,
-            "Current Value (₹)": 2_14_500,
-        },
-        {
-            "Asset": "HDFC 3-Year FD",
-            "Platform": "Bank FD",
-            "Invested (₹)": 1_50_000,
-            "Current Value (₹)": 1_72_350,
-        },
+        {"Asset": "Reliance Industries", "Platform": "Upstox", "Invested (₹)": 75000, "Current Value (₹)": 91350},
+        {"Asset": "Axis Bluechip Fund", "Platform": "Zerodha", "Invested (₹)": 100000, "Current Value (₹)": 118400},
+        {"Asset": "SBI 1-Year FD", "Platform": "Bank FD", "Invested (₹)": 200000, "Current Value (₹)": 214500},
     ]
     df = pd.DataFrame(portfolio)
-    df["Returns (%)"] = round(
-        (df["Current Value (₹)"] - df["Invested (₹)"]) / df["Invested (₹)"] * 100, 2
-    )
+    df["Returns (%)"] = round((df["Current Value (₹)"] - df["Invested (₹)"]) / df["Invested (₹)"] * 100, 2)
     return df
 
-
-# ─── Load data once ────────────────────────────────────────────────────────────
 expenses_df = generate_expense_data()
 portfolio_df = generate_portfolio_data()
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SIDEBAR — Brand + Navigation
 # ═══════════════════════════════════════════════════════════════════════════════
 
 with st.sidebar:
-    st.markdown('<div class="brand-title">Hisaab Kitaab</div>', unsafe_allow_html=True)
-    st.markdown('<div class="brand-sub">Personal Finance Dashboard</div>', unsafe_allow_html=True)
+    # ── Sidebar Brand Headers ──
+    st.markdown('<div style="font-family:\'Geist\'; font-size:24px; font-weight:700; color:#ffffff; letter-spacing:-0.01em; margin-left:8px; margin-top:8px;">Hisaab Kitaab</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-family:\'Inter\'; font-size:14px; color:#505f76; font-weight:500; margin-left:8px; margin-bottom:32px;">Institutional Terminal</div>', unsafe_allow_html=True)
+    
+    # ── Verify State Memory Routing ──
+    if "active_page" not in st.session_state:
+        st.session_state.active_page = "Dashboard"
+    page = st.session_state.active_page
+    
+    # ── Custom Menu Array Definitions ──
+    # Format: (Label String, Unicode Emoji alternative for absolute layout safety)
+    menu_options = [
+        ("Dashboard", "Dashboard"),
+        ("Ledger", " Ledger"),
+        ("Assets", " Assets"),
+        ("Analytics", "Analytics"),
+    
+    ]
+    
+    # ── Render Clean, Non-Overlapping Menu Row Buttons ──
+    for label, display_text in menu_options:
+        is_active = (page == label)
+        
+        # If active, we render an empty container and style it or use st.html/classes if supported, 
+        # or we can write a single clean click capture line:
+        if is_active:
+            # We use markdown containing a small hidden tracking style script to force the active pill color class onto this button dynamically
+            st.markdown(f'<style>button[key*="nav_btn_{label}"] {{ background-color: #c9ddff !important; color: #0b192c !important; font-weight: 600 !important; }}</style>', unsafe_allow_html=True)
+            
+        if st.button(display_text, key=f"nav_btn_{label}", use_container_width=True):
+            st.session_state.active_page = label
+            st.rerun()
 
-    st.divider()
+    # Clear structural spacer blocks
+    for _ in range(6):
+        st.write("")
 
-    # Navigation radio
-    page = st.radio(
-        "Navigate",
-        ["Expenses", "Investments", "Insights"],
-        label_visibility="collapsed",
-    )
+    # ── Bottom Primary Call to Action Button ──
+    if st.button("＋ New Transaction", key="sidebar_new_txn_cta", use_container_width=True):
+        st.toast("Initialization of transaction container ledger session...")
+        
+    for _ in range(2):
+        st.write("")
 
-    st.divider()
-
-    # Contextual sidebar info
-    total_invested = portfolio_df["Invested (₹)"].sum()
-    total_current = portfolio_df["Current Value (₹)"].sum()
-    net_gain = total_current - total_invested
-    st.markdown("##### Quick Snapshot")
-    st.caption(f"**Portfolio Value:** ₹{total_current:,.0f}")
-    st.caption(f"**Net Gain:** ₹{net_gain:,.0f}")
-    st.caption(f"**30-Day Spend:** ₹{expenses_df['Amount (₹)'].sum():,.0f}")
-
-    st.divider()
-    st.markdown(
-        '<div class="footer">Built with Streamlit<br>© 2026 Hisaab Kitaab</div>',
-        unsafe_allow_html=True,
-    )
-
+    # ── System Utilities Footnotes ──
+    st.markdown('<div style="padding-left:16px; font-size:14px; font-family:\'Inter\'; font-weight:500; color:#505f76; display:flex; align-items:center; gap:12px; margin-bottom:16px; cursor:pointer;"><span class="material-symbols-outlined" style="font-size:20px;">help</span> Support</div>', unsafe_allow_html=True)
+    st.markdown('<div style="padding-left:16px; font-size:14px; font-family:\'Inter\'; font-weight:500; color:#505f76; display:flex; align-items:center; gap:12px; cursor:pointer;"><span class="material-symbols-outlined" style="font-size:20px;">logout</span> Sign Out</div>', unsafe_allow_html=True)
+# ═══════════════════════════════════════════════════════════════════════════════
+# GLOBAL APP HEADER (Must be outside sidebar!)
+# ═══════════════════════════════════════════════════════════════════════════════
+st.markdown("""
+    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; height: 48px; margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; gap: 12px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 9999px; px: 16px; padding: 8px 16px; width: 380px;">
+            <span class="material-symbols-outlined" style="color: #505f76; font-size: 18px;">search</span>
+            <input type="text" placeholder="Search assets, markers, or accounts..." style="background: transparent; border: none; font-size: 13px; color: #1b1b1b; width: 100%; outline: none; padding: 0;"/>
+        </div>
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <button style="position: relative; padding: 6px; background: transparent; border: none; cursor: pointer; color: #505f76;">
+                <span class="material-symbols-outlined" style="font-size: 22px;">notifications</span>
+                <span style="position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; background-color: #ba1a1a; border-radius: 999px;"></span>
+            </button>
+            <button style="padding: 6px; background: transparent; border: none; cursor: pointer; color: #505f76;">
+                <span class="material-symbols-outlined" style="font-size: 22px;">settings</span>
+            </button>
+            <div style="width: 32px; height: 32px; border-radius: 999px; border: 1px solid #e2e8f0; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                <img src="https://lh3.googleusercontent.com/a/default-user=s64-c" alt="User" style="width: 100%; height: 100%; object-fit: cover;"/>
+            </div>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  PAGE 1 — THE PULSE  (Expense Tracker)
+# PAGE 1 — DASHBOARD
 # ═══════════════════════════════════════════════════════════════════════════════
-
-if page == "Expenses":
-
-    # ── Header ────────────────────────────────────────────────────────────────
-    st.markdown('<p class="section-header">The Pulse</p>', unsafe_allow_html=True)
-    st.markdown(
-        '<p class="section-subtitle">Track every rupee. Own every decision.</p>',
-        unsafe_allow_html=True,
-    )
-
-    # ── Date filter ───────────────────────────────────────────────────────────
-    col_a, col_b, _ = st.columns([1, 1, 2])
-    min_date = expenses_df["Date"].min().date()
-    max_date = expenses_df["Date"].max().date()
-
-    with col_a:
-        start_date = st.date_input("From", value=min_date, min_value=min_date, max_value=max_date)
-    with col_b:
-        end_date = st.date_input("To", value=max_date, min_value=min_date, max_value=max_date)
-
-    # Filter data by selected range
-    mask = (expenses_df["Date"].dt.date >= start_date) & (expenses_df["Date"].dt.date <= end_date)
-    filtered_df = expenses_df.loc[mask].copy()
-
-    st.divider()
-
-    # ── Top-level metric cards ────────────────────────────────────────────────
-    today_mask = filtered_df["Date"].dt.date == datetime.now().date()
-    today_spend = filtered_df.loc[today_mask, "Amount (₹)"].sum()
-    total_spend = filtered_df["Amount (₹)"].sum()
-
-    if not filtered_df.empty:
-        top_category = (
-            filtered_df.groupby("Category")["Amount (₹)"]
-            .sum()
-            .idxmax()
-        )
-        top_category_amt = filtered_df.groupby("Category")["Amount (₹)"].sum().max()
-    else:
-        top_category = "—"
-        top_category_amt = 0
-
-    bank_balance = 45_000  # Simulated starting balance
-
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Current Bank Balance", f"₹{bank_balance:,.0f}")
-    m2.metric("Today's Expenses", f"₹{today_spend:,.0f}")
-    m3.metric("Period Total", f"₹{total_spend:,.0f}")
-    m4.metric("Highest Category", f"{top_category}", delta=f"₹{top_category_amt:,.0f}")
-
-    st.divider()
-
-
-    import datetime as _dt
-
-    # ── Shared date/budget constants ──────────────────────────────────────────
-    _today        = _dt.date.today()
-    _last_day     = (_today.replace(day=28) + _dt.timedelta(days=4)).replace(day=1) - _dt.timedelta(days=1)
-    _days_left    = (_last_day - _today).days + 1
-    _total_budget = 15_000  # Monthly budget (₹)
-
-    # Current-month spends from the real data
-    _month_mask      = (
-        (expenses_df["Date"].dt.month == _today.month) &
-        (expenses_df["Date"].dt.year  == _today.year)
-    )
-    _current_spends  = expenses_df.loc[_month_mask, "Amount (₹)"].sum()
-
-    # ── CSS for Google-color nudge cards (scoped class names) ─────────────────
+if page == "Dashboard":
+    
     st.markdown("""
-    <style>
-        .nudge-card {
-            border-radius: 14px;
-            padding: 18px 22px;
-            margin-bottom: 10px;
-            font-size: 0.92rem;
-            line-height: 1.6;
-            border: 1.5px solid transparent;
-        }
-        .nudge-green  { background: #E6F4EA; border-color: #34A853; color: #1e4d2b; }
-        .nudge-yellow { background: #FEF9E0; border-color: #FBBC05; color: #5a4400; }
-        .nudge-red    { background: #FCE8E6; border-color: #EA4335; color: #6b1a14; }
-        .nudge-blue   { background: #E8F0FE; border-color: #4285F4; color: #1a3a6b; }
-        .nudge-label  { font-weight: 700; font-size: 0.78rem; text-transform: uppercase;
-                        letter-spacing: 0.06em; margin-bottom: 4px; }
-    </style>
+        <div style="display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px;">
+            <div>
+                <h2 style="font-family: 'Geist'; font-size: 30px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em; margin: 0;">Financial Overview</h2>
+                <p style="color: #4c4546; font-size: 12px; margin-top: 2px; margin-bottom: 0;">Last updated: Oct 24, 2023 at 09:41 AM</p>
+            </div>
+        </div>
     """, unsafe_allow_html=True)
-
-    st.markdown("##### Smart Nudges")
-
-    nudge_c1, nudge_c2 = st.columns(2)
-
-    # ── 1. Safe-to-Spend ──────────────────────────────────────────────────────
-    with nudge_c1:
-        if _days_left > 0:
-            _safe_to_spend = (_total_budget - _current_spends) / _days_left
-            if _safe_to_spend > 500:
-                st.markdown(
-                    f'<div class="nudge-card nudge-green">'
-                    f'<div class="nudge-label">Safe to Spend Today</div>'
-                    f"You're doing great! You have <strong>₹{int(_safe_to_spend):,}</strong> "
-                    f"safe to spend today without overshooting your monthly budget."
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(
-                    f'<div class="nudge-card nudge-yellow">'
-                    f'<div class="nudge-label">Safe to Spend Today</div>'
-                    f"Careful! Your safe limit for today is only <strong>₹{int(_safe_to_spend):,}</strong>. "
-                    f"Tighten up to stay within budget."
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-        else:
-            st.markdown(
-                '<div class="nudge-card nudge-blue">'
-                '<div class="nudge-label">Safe to Spend Today</div>'
-                "Last day of the month — spend mindfully!"
-                '</div>',
-                unsafe_allow_html=True,
-            )
-
-    # ── 2. Month-End Burn Predictor ───────────────────────────────────────────
-    with nudge_c2:
-        _current_day      = _today.day
-        _burn_rate        = _current_spends / max(_current_day, 1)
-        _predicted_total  = _burn_rate * _last_day.day
-
-        if _predicted_total > _total_budget:
-            _deficit = _predicted_total - _total_budget
-            st.markdown(
-                f'<div class="nudge-card nudge-red">'
-                f'<div class="nudge-label">Month-End Burn Predictor</div>'
-                f"At this burn rate you'll <strong>overspend by ₹{int(_deficit):,}</strong> "
-                f"by month-end. Try cutting down on Zomato or impulse shopping!"
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            _projected_saving = _total_budget - _predicted_total
-            st.markdown(
-                f'<div class="nudge-card nudge-green">'
-                f'<div class="nudge-label">Month-End Burn Predictor</div>'
-                f"Trend looks good! You are projected to <strong>save ₹{int(_projected_saving):,}</strong> "
-                f"by month-end at your current pace."
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-    nudge_c3, nudge_c4 = st.columns(2)
-
-    # ── 3. Zomato/Swiggy Leakage Alert ───────────────────────────────────────
-    with nudge_c3:
-        _food_df      = expenses_df[expenses_df["Merchant"].isin(["Zomato", "Swiggy"])]
-        _food_df      = _food_df.copy()
-        _food_df["Week"] = _food_df["Date"].dt.isocalendar().week
-
-        _this_week_num  = _dt.date.today().isocalendar()[1]
-        _this_week_amt  = _food_df[_food_df["Week"] == _this_week_num]["Amount (₹)"].sum()
-        _past_weeks     = _food_df[_food_df["Week"] < _this_week_num]
-
-        if not _past_weeks.empty:
-            _weekly_avg = _past_weeks.groupby("Week")["Amount (₹)"].sum().tail(3).mean()
-        else:
-            _weekly_avg = _this_week_amt  # fallback: no prior data
-
-        if _weekly_avg > 0 and _this_week_amt > (_weekly_avg * 1.2):
-            _spike_pct = int((_this_week_amt / _weekly_avg - 1) * 100)
-            st.markdown(
-                f'<div class="nudge-card nudge-yellow">'
-                f'<div class="nudge-label">Food Delivery Leakage</div>'
-                f"Your <strong>Zomato/Swiggy</strong> spend has spiked "
-                f"<strong>{_spike_pct}%</strong> this week "
-                f"(₹{int(_this_week_amt):,} vs avg ₹{int(_weekly_avg):,}). "
-                f"Consider cooking at home to plug the leak."
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f'<div class="nudge-card nudge-green">'
-                f'<div class="nudge-label">Food Delivery Leakage</div>'
-                f"Food delivery spend looks normal this week "
-                f"(₹{int(_this_week_amt):,}). Keep it up!"
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-    # ── 4. Wealth-First Sweep ─────────────────────────────────────────────────
-    with nudge_c4:
-        _expected_daily = _total_budget / _last_day.day
-        if _days_left > 0:
-            _safe_to_spend_sweep = (_total_budget - _current_spends) / _days_left
-            _surplus             = _safe_to_spend_sweep - _expected_daily
-        else:
-            _surplus = 0
-
-        if _surplus > 200:
-            st.markdown(
-                f'<div class="nudge-card nudge-blue">'
-                f'<div class="nudge-label">Smart Save Suggestion</div>'
-                f"You've been spending below your daily target — "
-                f"move <strong>₹{int(_surplus):,}</strong> to your SIP or "
-                f"Gold Vault and let it compound!"
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                '<div class="nudge-card nudge-blue">'
-                '<div class="nudge-label">Smart Save Suggestion</div>'
-                "Keep spending in check for a few more days to unlock a "
-                "<strong>Wealth Sweep</strong> suggestion."
-                '</div>',
-                unsafe_allow_html=True,
-            )
-
-    st.divider()
-
-    # ── Charts ────────────────────────────────────────────────────────────────
-    chart_col, table_col = st.columns([1, 1])
-
-    with chart_col:
-        st.markdown("##### Spending by Category")
-        if not filtered_df.empty:
-            cat_spend = (
-                filtered_df.groupby("Category")["Amount (₹)"]
-                .sum()
-                .reset_index()
-                .sort_values("Amount (₹)", ascending=False)
-            )
-            fig_pie = px.pie(
-                cat_spend,
-                values="Amount (₹)",
-                names="Category",
-                hole=0.45,
-                color_discrete_sequence=px.colors.qualitative.Set2,
-            )
-            fig_pie.update_traces(
-                textposition="inside",
-                textinfo="percent+label",
-                hovertemplate="<b>%{label}</b><br>₹%{value:,.0f}<extra></extra>",
-            )
-            fig_pie.update_layout(
-                margin=dict(t=20, b=20, l=20, r=20),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="Inter", color="#334155"),
-                showlegend=False,
-                height=380,
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
-        else:
-            st.info("No expenses in this date range.")
-
-    with table_col:
-        st.markdown("##### Daily Spend Trend")
-        if not filtered_df.empty:
-            daily_spend = (
-                filtered_df.groupby(filtered_df["Date"].dt.date)["Amount (₹)"]
-                .sum()
-                .reset_index()
-            )
-            daily_spend.columns = ["Date", "Amount (₹)"]
-            daily_spend = daily_spend.sort_values("Date")
-
-            fig_bar = px.bar(
-                daily_spend,
-                x="Date",
-                y="Amount (₹)",
-                color_discrete_sequence=["#2563EB"],
-            )
-            fig_bar.update_layout(
-                margin=dict(t=20, b=20, l=20, r=20),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(showgrid=False, title=""),
-                yaxis=dict(showgrid=True, gridcolor="#F1F5F9", title="₹"),
-                font=dict(family="Inter", color="#334155"),
-                height=380,
-            )
-            fig_bar.update_traces(
-                hovertemplate="<b>%{x}</b><br>₹%{y:,.0f}<extra></extra>",
-                marker_cornerradius=6,
-            )
-            st.plotly_chart(fig_bar, use_container_width=True)
-        else:
-            st.info("No expenses in this date range.")
-
-    st.divider()
-
-    # ── Transactions table ────────────────────────────────────────────────────
-    st.markdown("##### Recent Transactions")
-    if not filtered_df.empty:
-        display_df = filtered_df.copy()
-        display_df["Date"] = display_df["Date"].dt.strftime("%d %b %Y")
-        display_df["Amount (₹)"] = display_df["Amount (₹)"].apply(lambda x: f"₹{x:,.2f}")
-        st.dataframe(
-            display_df,
-            use_container_width=True,
-            hide_index=True,
-            height=420,
-        )
-    else:
-        st.info("No transactions found for the selected dates.")
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-#  PAGE 2 — Portfolio & Investments
-# ═══════════════════════════════════════════════════════════════════════════════
-
-elif page == "Investments":
-
-    st.markdown('<p class="section-header">The Vault</p>', unsafe_allow_html=True)
-    st.markdown(
-        '<p class="section-subtitle">Your wealth, organised and transparent.</p>',
-        unsafe_allow_html=True,
-    )
-
-    # ── Aggregate metrics ─────────────────────────────────────────────────────
-    total_invested = portfolio_df["Invested (₹)"].sum()
-    total_current = portfolio_df["Current Value (₹)"].sum()
-    total_return_pct = round((total_current - total_invested) / total_invested * 100, 2)
-    net_pnl = total_current - total_invested
-
-    v1, v2, v3, v4 = st.columns(4)
-    v1.metric("Total Invested", f"₹{total_invested:,.0f}")
-    v2.metric("Current Value", f"₹{total_current:,.0f}")
-    v3.metric("Net P&L", f"₹{net_pnl:,.0f}", delta=f"{total_return_pct}%")
-    v4.metric("Assets Held", f"{len(portfolio_df)}")
-
-    st.write("")  
     
-    
-    inv_col1, inv_col2 = st.columns(2)
-    
-    with inv_col1:
-        
-        st.markdown("""
-        <div style="border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; min-height: 220px; background-color: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-            <div style="font-weight: 700; font-size: 1.1rem; color: #1E293B; margin-bottom: 8px;">Risk Analysis</div>
-            <div style="font-size: 0.88rem; color: #64748B; line-height: 1.5; margin-bottom: 24px;">
-                Test how your investments handle sudden global market crashes and volatility shocks.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        
-        if st.button("Check Risk", key="btn_risk_stress_top", type="primary", use_container_width=True):
-            with st.spinner("Processing"):
-                from api_connection import simulate_institutional_investment_strategy
-                summary_data = portfolio_df[["Asset", "Platform", "Current Value (₹)", "Returns (%)"]].to_json(orient="records")
-                risk_intelligence_text = simulate_institutional_investment_strategy(summary_data)
-                
-                st.markdown(f"""
-                <div class="insight-box-blue" style="margin-top: 15px;">
-                    <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#2563EB;">Institutional Quant Assessment</span><br><br>
-                    {risk_intelligence_text}
-                </div>
-                """, unsafe_allow_html=True)
-                
-    with inv_col2:
-        
-        st.markdown("""
-        <div style="border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; min-height: 220px; background-color: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-            <div style="font-weight: 700; font-size: 1.1rem; color: #1E293B; margin-bottom: 8px;">Tax Optimizer</div>
-            <div style="font-size: 0.88rem; color: #64748B; line-height: 1.5; margin-bottom: 24px;">
-                Find smart, fully legal strategies to lower your investment tax bills automatically.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-       
-        if st.button("Save Tax", key="btn_tax_harvest_top", type="secondary", use_container_width=True):
-            with st.spinner("Processing"):
-                from api_connection import simulate_institutional_investment_strategy
-                summary_data = portfolio_df[["Asset", "Platform", "Current Value (₹)", "Returns (%)"]].to_json(orient="records")
-                tax_intelligence_text = simulate_institutional_investment_strategy(summary_data)
-                
-                st.markdown(f"""
-                <div class="insight-box-green" style="margin-top: 15px;">
-                    <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#16A34A;">Corporate Tax Shield Audit</span><br><br>
-                    {tax_intelligence_text}
-                </div>
-                """, unsafe_allow_html=True)
+    act_col1, act_col2 = st.columns([3, 1])
+    with act_col2:
+        sub_act_c1, sub_act_c2 = st.columns(2)
+        with sub_act_c1:
+            st.button("⇄ Transfer", key="dash_transfer_btn", type="secondary", use_container_width=True)
+        with sub_act_c2:
+            st.button("＋ Add Asset", key="dash_add_asset_btn", type="primary", use_container_width=True)
 
     st.write("")
 
+    dash_m1, dash_m2, dash_m3, dash_m4 = st.columns(4)
+    dash_m1.metric("TOTAL VALUE", "₹1,482,904.52", delta="+12.4% (₹164k)")
+    dash_m2.metric("NET DEPOSITS", "₹820,000.00", delta="Lifetime contributions", delta_color="inverse")
+    dash_m3.metric("LIQUID ASSETS", "₹142,400.12", delta="15% Total Capital Split", delta_color="normal")
+    dash_m4.metric("RISK SCORE", "6.8 / 10", delta="Moderate-High Risk", delta_color="off")
+
     st.divider()
 
-    # ── Portfolio cards by platform ───────────────────────────────────────────
-    platforms = portfolio_df["Platform"].unique()
+    chart_row_c1, chart_row_c2 = st.columns([5, 7])
 
-    for platform in platforms:
-        st.markdown(f"##### {platform}")
-        plat_df = portfolio_df[portfolio_df["Platform"] == platform]
-        cols = st.columns(len(plat_df))
-        for i, (_, row) in enumerate(plat_df.iterrows()):
-            ret_class = "portfolio-return-positive" if row["Returns (%)"] >= 0 else "portfolio-return-negative"
-            ret_sign = "+" if row["Returns (%)"] >= 0 else ""
-            with cols[i]:
-                st.markdown(f"""
-                <div class="portfolio-card">
-                    <div class="portfolio-label">{row['Asset']}</div>
-                    <div class="portfolio-value">₹{row['Current Value (₹)']:,.0f}</div>
-                    <div style="font-size:0.78rem; color:#94A3B8; margin:4px 0;">
-                        Invested ₹{row['Invested (₹)']:,.0f}
+    with chart_row_c1:
+        st.markdown("""
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; min-height: 380px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <h3 style="font-family: 'Geist'; font-size: 18px; font-weight: 600; color: #1b1b1b; margin-top: 0; margin-bottom: 24px;">Asset Allocation</h3>
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div style="display: flex; align-items: center; font-size: 14px;"><span style="width: 10px; height: 10px; border-radius: 999px; background: #2563eb; margin-right: 12px;"></span>Equities <span style="font-family: 'Geist'; color: #4c4546; margin-left: auto; font-weight: 500;">60%</span></div>
+                        <div style="display: flex; align-items: center; font-size: 14px;"><span style="width: 10px; height: 10px; border-radius: 999px; background: #1e8e3e; margin-right: 12px;"></span>Fixed Income <span style="font-family: 'Geist'; color: #4c4546; margin-left: auto; font-weight: 500;">25%</span></div>
+                        <div style="display: flex; align-items: center; font-size: 14px;"><span style="width: 10px; height: 10px; border-radius: 999px; background: #f9ab00; margin-right: 12px;"></span>Real Estate <span style="font-family: 'Geist'; color: #4c4546; margin-left: auto; font-weight: 500;">10%</span></div>
+                        <div style="display: flex; align-items: center; font-size: 14px;"><span style="width: 10px; height: 10px; border-radius: 999px; background: #e2e2e2; margin-right: 12px;"></span>Cash <span style="font-family: 'Geist'; color: #4c4546; margin-left: auto; font-weight: 500;">5%</span></div>
                     </div>
-                    <div class="{ret_class}">{ret_sign}{row['Returns (%)']}%</div>
                 </div>
-                """, unsafe_allow_html=True)
-        st.write("")  # spacer
+                <div style="display: flex; justify-content: center; margin-top: 16px;">
+                    <div style="position: relative; width: 140px; height: 140px;">
+                        <svg style="width: 100%; height: 100%; transform: rotate(-90deg);" viewBox="0 0 36 36">
+                            <circle cx="18" cy="18" fill="none" r="15.915" stroke="#f1f5f9" stroke-width="3.5"></circle>
+                            <circle cx="18" cy="18" fill="none" r="15.915" stroke="#2563eb" stroke-dasharray="60 40" stroke-dashoffset="0" stroke-width="3.5"></circle>
+                            <circle cx="18" cy="18" fill="none" r="15.915" stroke="#1e8e3e" stroke-dasharray="25 75" stroke-dashoffset="-60" stroke-width="3.5"></circle>
+                            <circle cx="18" cy="18" fill="none" r="15.915" stroke="#f9ab00" stroke-dasharray="10 90" stroke-dashoffset="-85" stroke-width="3.5"></circle>
+                        </svg>
+                        <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                            <span style="font-size: 9px; color: #4c4546; text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em;">TOTAL</span>
+                            <span style="font-family: 'Geist'; font-weight: 700; color: #1b1b1b; font-size: 15px;">$1.48M</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
-    st.divider()
-
-
-    # ── Allocation Chart ──────────────────────────────────────────────────────
-    alloc_col, trend_col = st.columns([1, 1])
-
-    with alloc_col:
-        st.markdown("##### Asset Allocation")
-        alloc_df = (
-            portfolio_df.groupby("Platform")["Current Value (₹)"]
-            .sum()
-            .reset_index()
-        )
-        fig_alloc = px.pie(
-            alloc_df,
-            values="Current Value (₹)",
-            names="Platform",
-            hole=0.48,
-            color_discrete_sequence=["#2563EB", "#7C3AED", "#0EA5E9"],
-        )
-        fig_alloc.update_traces(
-            textposition="inside",
-            textinfo="percent+label",
-            hovertemplate="<b>%{label}</b><br>₹%{value:,.0f}<extra></extra>",
-        )
-        fig_alloc.update_layout(
-            margin=dict(t=20, b=20, l=20, r=20),
+    with chart_row_c2:
+        st.markdown("""
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; min-height: 380px;">
+                <h3 style="font-family: 'Geist'; font-size: 18px; font-weight: 600; color: #1b1b1b; margin-top: 0; margin-bottom: 12px;">Portfolio Performance</h3>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        perf_data = pd.DataFrame({
+            "Timeline": ["Oct '22", "Jan '23", "Apr '23", "Jul '23", "Current"],
+            "Valuation ($)": [420000, 480000, 510000, 680000, 1482904]
+        })
+        
+        fig_perf = px.bar(perf_data, x="Timeline", y="Valuation ($)", color_discrete_sequence=["#2563eb"])
+        fig_perf.update_layout(
+            margin=dict(t=10, b=10, l=10, r=10),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Inter", color="#334155"),
-            showlegend=False,
-            height=340,
+            xaxis=dict(showgrid=False, title=""),
+            yaxis=dict(showgrid=True, gridcolor="#f1f5f9", title=""),
+            font=dict(family="Inter", color="#1b1b1b"),
+            height=280
         )
-        st.plotly_chart(fig_alloc, use_container_width=True)
-
-    # ── Market Headlines ──────────────────────────────────────────────────────
-    with trend_col:
-        st.markdown("##### Market Updates — What's New")
-        headlines = [
-            {
-                "icon": "",
-                "text": "<strong>Nifty 50 closes at all-time high of 27,350</strong> — "
-                        "Broad-based rally led by banking and IT heavyweights. "
-                        "FII inflows surge ₹4,200 Cr in the last week.",
-            },
-            {
-                "icon": "",
-                "text": "<strong>SBI revises FD rates upward by 25 bps</strong> — "
-                        "1-year deposits now earn 7.10% p.a. Senior citizen "
-                        "rates revised to 7.60%. Effective from April 15, 2026.",
-            },
-            {
-                "icon": "",
-                "text": "<strong>Small-cap mutual funds see record SIP inflows</strong> — "
-                        "₹3,800 Cr poured into small-cap funds in March 2026. "
-                        "SEBI cautions investors to assess risk carefully.",
-            },
-            {
-                "icon": "",
-                "text": "<strong>RBI holds repo rate at 6.25%</strong> — "
-                        "MPC unanimously decides to maintain rates amid "
-                        "global uncertainty. Inflation stays within target band.",
-            },
-        ]
-        for hl in headlines:
-            st.markdown(
-                f'<div class="headline-card">'
-                f'{hl["text"]}</div>',
-                unsafe_allow_html=True,
-            )
-
+        fig_perf.update_traces(marker_cornerradius=4)
+        st.plotly_chart(fig_perf, use_container_width=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  PAGE 3 — INSIGHTS (AI Financial Analyst with Global Liquidity Optimization)
+# PAGE 2 — ASSETS
 # ═══════════════════════════════════════════════════════════════════════════════
+elif page == "Assets":
 
-elif page == "Insights":
+    # ── Global Calculations ──
+    total_invested = portfolio_df["Invested (₹)"].sum()
+    total_current = portfolio_df["Current Value (₹)"].sum()
+    net_pnl = total_current - total_invested
+    total_return_pct = (net_pnl / total_invested) * 100 if total_invested > 0 else 0
+    assets_held = len(portfolio_df)
 
-    st.markdown('<p class="section-header">Financial Insights</p>', unsafe_allow_html=True)
-    st.markdown(
-        '<p class="section-subtitle">Algorithmic liquidity analysis and predictive capital optimization.</p>',
-        unsafe_allow_html=True,
-    )
+    # ── Top 4 Metric Cards ──
+    a_m1, a_m2, a_m3, a_m4 = st.columns(4)
+    
+    with a_m1:
+        st.markdown(f"""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 130px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Total Invested</div>
+<div style="font-family: 'Geist'; font-size: 28px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em;">₹{total_invested:,.0f}</div>
+</div>
+""", unsafe_allow_html=True)
 
-    # Compute actual summary parameters from dataframe to pass to the API channel
-    total_spend = expenses_df["Amount (₹)"].sum()
-    daily_avg = expenses_df["Amount (₹)"].mean()
-    merchant_spend = expenses_df.groupby("Merchant")["Amount (₹)"].sum()
-    top_merchant = merchant_spend.idxmax()
-    top_merchant_amt = merchant_spend.max()
-    food_spend = expenses_df[expenses_df["Category"] == "Food & Dining"]["Amount (₹)"].sum()
-    
-    # Global balance simulation across multiple external digital wallets
-    liquid_cash_pool = 45000.00 
+    with a_m2:
+        st.markdown(f"""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 130px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Current Value</div>
+<div style="font-family: 'Geist'; font-size: 28px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em;">₹{total_current:,.0f}</div>
+</div>
+""", unsafe_allow_html=True)
 
-    st.write("### AI Insights")
+    with a_m3:
+        st.markdown(f"""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 130px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Net P&L</div>
+<div style="display: flex; align-items: center; gap: 12px;">
+<div style="font-family: 'Geist'; font-size: 28px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em;">₹{net_pnl:,.0f}</div>
+<div style="display: flex; align-items: center; background: #dcfce7; color: #16a34a; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 99px;"><span class="material-symbols-outlined" style="font-size: 16px; margin-right: 2px;">arrow_drop_up</span> {total_return_pct:.2f}%</div>
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+    with a_m4:
+        st.markdown(f"""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 130px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Assets Held</div>
+<div style="font-family: 'Geist'; font-size: 28px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em;">{assets_held}</div>
+</div>
+""", unsafe_allow_html=True)
+
+    st.write("")
+
+    # ── Allocation & Pulse Row ──
+    a_row_c1, a_row_c2 = st.columns([7, 5])
+
+    with a_row_c1:
+        st.markdown(f"""
+<div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px; height: 320px; display: flex; align-items: center; justify-content: space-between;">
+<div>
+<h3 style="font-family: 'Geist'; font-size: 18px; font-weight: 600; color: #1b1b1b; margin-top: 0; margin-bottom: 24px;">Asset Allocation</h3>
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<div style="display: flex; align-items: center; font-size: 14px; width: 200px;"><span style="width: 12px; height: 12px; border-radius: 50%; background: #2563eb; margin-right: 12px;"></span><span style="color: #1b1b1b;">Bank FD</span> <span style="font-family: 'Geist'; color: #505f76; margin-left: auto; font-weight: 500;">44.9%</span></div>
+<div style="display: flex; align-items: center; font-size: 14px; width: 200px;"><span style="width: 12px; height: 12px; border-radius: 50%; background: #0ea5e9; margin-right: 12px;"></span><span style="color: #1b1b1b;">Stocks</span> <span style="font-family: 'Geist'; color: #505f76; margin-left: auto; font-weight: 500;">21.4%</span></div>
+<div style="display: flex; align-items: center; font-size: 14px; width: 200px;"><span style="width: 12px; height: 12px; border-radius: 50%; background: #8b5cf6; margin-right: 12px;"></span><span style="color: #1b1b1b;">Mutual Funds</span> <span style="font-family: 'Geist'; color: #505f76; margin-left: auto; font-weight: 500;">33.7%</span></div>
+</div>
+</div>
+<div style="position: relative; width: 200px; height: 200px; margin-right: 24px;">
+<svg style="width: 100%; height: 100%; transform: rotate(-90deg);" viewBox="0 0 36 36">
+<circle cx="18" cy="18" fill="none" r="14" stroke="#f1f5f9" stroke-width="5"></circle>
+<circle cx="18" cy="18" fill="none" r="14" stroke="#2563eb" stroke-dasharray="44.9 55.1" stroke-dashoffset="0" stroke-width="5"></circle>
+<circle cx="18" cy="18" fill="none" r="14" stroke="#0ea5e9" stroke-dasharray="21.4 78.6" stroke-dashoffset="-44.9" stroke-width="5"></circle>
+<circle cx="18" cy="18" fill="none" r="14" stroke="#8b5cf6" stroke-dasharray="33.7 66.3" stroke-dashoffset="-66.3" stroke-width="5"></circle>
+</svg>
+<div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+<span style="font-size: 10px; color: #505f76; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">TOTAL</span>
+<span style="font-family: 'Geist'; font-weight: 700; color: #1b1b1b; font-size: 18px;">₹{total_current/1000:,.0f}k</span>
+</div>
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+    with a_row_c2:
+        st.markdown("""
+<div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 320px;">
+<h3 style="font-family: 'Geist'; font-size: 18px; font-weight: 600; color: #1b1b1b; margin-top: 0; margin-bottom: 20px;">Market Pulse</h3>
+<div style="display: flex; flex-direction: column; gap: 16px;">
+<div style="border-left: 4px solid #2563eb; background: #f8fafc; padding: 12px 16px; border-radius: 0 4px 4px 0;">
+<div style="font-size: 13px; font-weight: 600; color: #1b1b1b; margin-bottom: 2px;">Nifty 50 at Record High</div>
+<div style="font-size: 12px; color: #505f76;">Closes at 27,350. FII inflows surge ₹4,200 Cr this week.</div>
+</div>
+<div style="border-left: 4px solid #f9ab00; background: #f8fafc; padding: 12px 16px; border-radius: 0 4px 4px 0; opacity: 0.8;">
+<div style="font-size: 13px; font-weight: 600; color: #1b1b1b; margin-bottom: 2px;">RBI Holds Repo Rate</div>
+<div style="font-size: 12px; color: #505f76;">MPC unanimously decides to maintain rates at 6.25%.</div>
+</div>
+<div style="border-left: 4px solid #8b5cf6; background: #f8fafc; padding: 12px 16px; border-radius: 0 4px 4px 0;">
+<div style="font-size: 13px; font-weight: 600; color: #1b1b1b; margin-bottom: 2px;">MF Record Inflows</div>
+<div style="font-size: 12px; color: #505f76;">Small-cap funds see ₹3,800 Cr poured in March 2026.</div>
+</div>
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+    st.write("")
+
+    # ── AI INTELLIGENCE CORE (Restored from your Python Logic) ──
+    ai_col1, ai_col2 = st.columns(2)
+    with ai_col1:
+        st.markdown("""
+<div style="border: 1px solid #e2e8f0; border-radius: 8px 8px 0 0; padding: 20px; background-color: #ffffff; border-bottom: none;">
+<div style="font-family: 'Geist'; font-weight: 600; font-size: 16px; color: #1b1b1b; margin-bottom: 6px;">Risk Analysis Engine</div>
+<div style="font-size: 13px; color: #505f76;">Test how your investments handle sudden market crashes and volatility shocks.</div>
+</div>
+""", unsafe_allow_html=True)
+        if st.button("Run Stress Test", key="btn_risk_stress_top", type="primary", use_container_width=True):
+            with st.spinner("Processing API Routing..."):
+                from api_connection import simulate_institutional_investment_strategy
+                summary_data = portfolio_df[["Asset", "Platform", "Current Value (₹)", "Returns (%)"]].to_json(orient="records")
+                risk_text = simulate_institutional_investment_strategy(summary_data)
+                st.markdown(f'<div class="insight-box-blue" style="margin-top:12px; border-radius: 0 0 8px 8px;"><span style="font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase;">Institutional Quant Assessment</span><br><br>{risk_text}</div>', unsafe_allow_html=True)
+
+    with ai_col2:
+        st.markdown("""
+<div style="border: 1px solid #e2e8f0; border-radius: 8px 8px 0 0; padding: 20px; background-color: #ffffff; border-bottom: none;">
+<div style="font-family: 'Geist'; font-weight: 600; font-size: 16px; color: #1b1b1b; margin-bottom: 6px;">Tax Harvesting Optimizer</div>
+<div style="font-size: 13px; color: #505f76;">Find smart, legal strategies to lower your investment tax bills automatically.</div>
+</div>
+""", unsafe_allow_html=True)
+        if st.button("Calculate Tax Shield", key="btn_tax_harvest_top", type="secondary", use_container_width=True):
+            with st.spinner("Processing API Routing..."):
+                from api_connection import simulate_institutional_investment_strategy
+                summary_data = portfolio_df[["Asset", "Platform", "Current Value (₹)", "Returns (%)"]].to_json(orient="records")
+                tax_text = simulate_institutional_investment_strategy(summary_data)
+                st.markdown(f'<div class="insight-box-green" style="margin-top:12px; border-radius: 0 0 8px 8px;"><span style="font-size:11px; font-weight:700; color:#1e8e3e; text-transform:uppercase;">Corporate Tax Shield Audit</span><br><br>{tax_text}</div>', unsafe_allow_html=True)
+
+    st.write("")
+
+    # ── Stock Portfolio Row (Upstox Assets) ──
+    st.markdown("<h3 style='font-family: Geist; font-size: 18px; font-weight: 600; color: #1b1b1b; margin-bottom: 16px;'>Stock Portfolio (Upstox)</h3>", unsafe_allow_html=True)
     
+    # Filter for Upstox specific assets from Python dataframe
+    upstox_df = portfolio_df[portfolio_df["Platform"].str.contains("Upstox", case=False, na=False)]
     
+    if not upstox_df.empty:
+        stock_cols = st.columns(3)
+        for idx, row in enumerate(upstox_df.iterrows()):
+            data = row[1]
+            col_idx = idx % 3
+            ret_color = "#16a34a" if data["Returns (%)"] >= 0 else "#ba1a1a"
+            ret_sign = "+" if data["Returns (%)"] >= 0 else ""
+            with stock_cols[col_idx]:
+                st.markdown(f"""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; transition: border-color 0.2s cursor: pointer;" onmouseover="this.style.borderColor='#1b1b1b'" onmouseout="this.style.borderColor='#e2e8f0'">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">{data['Asset']}</div>
+<div style="font-family: 'Geist'; font-size: 24px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em; margin-bottom: 16px;">₹{data['Current Value (₹)']:,.0f}</div>
+<div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+<span style="color: #505f76;">Invested: ₹{data['Invested (₹)']:,.0f}</span>
+<span style="color: {ret_color}; font-family: 'Geist'; font-weight: 600;">{ret_sign}{data['Returns (%)']}%</span>
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+    st.write("")
+
+    # ── Asset Ledger Table ──
+    table_header = """
+<div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-top: 16px; margin-bottom: 80px;">
+<div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+<h3 style="font-family: 'Geist'; font-size: 18px; font-weight: 600; color: #1b1b1b; margin: 0;">Asset Ledger</h3>
+<div style="display: flex; gap: 8px;">
+<button style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-family: 'Inter'; font-weight: 500; color: #1b1b1b; display: flex; align-items: center; gap: 6px;"><span class="material-symbols-outlined" style="font-size: 16px;">filter_list</span> Filter</button>
+<button style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-family: 'Inter'; font-weight: 500; color: #1b1b1b; display: flex; align-items: center; gap: 6px;"><span class="material-symbols-outlined" style="font-size: 16px;">download</span> Export</button>
+</div>
+</div>
+<table style="width: 100%; border-collapse: collapse; text-align: left;">
+<thead>
+<tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+<th style="padding: 16px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em;">Asset Name</th>
+<th style="padding: 16px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em;">Category</th>
+<th style="padding: 16px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Allocation</th>
+<th style="padding: 16px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Current Value</th>
+<th style="padding: 16px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">P&L (%)</th>
+<th style="padding: 16px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; text-align: center;">Status</th>
+</tr>
+</thead>
+<tbody>
+"""
     
-    analysis_col1, analysis_col2, analysis_col3 = st.columns(3)
+    table_rows = ""
+    for idx, row in portfolio_df.iterrows():
+        name = row['Asset']
+        cat = row['Platform'] # Mapping platform to category for display
+        c_val = row['Current Value (₹)']
+        alloc_pct = (c_val / total_current) * 100 if total_current > 0 else 0
+        pnl_pct = row['Returns (%)']
+        
+        pnl_color = "#16a34a" if pnl_pct >= 0 else "#ba1a1a"
+        pnl_sign = "+" if pnl_pct >= 0 else ""
+        
+        # Simulated Status
+        status = "SETTLED" if pnl_pct > 0 else "PENDING"
+        if status == "SETTLED":
+            status_style = "color: #505f76; border: 1px solid #505f76;"
+        else:
+            status_style = "color: #f9ab00; border: 1px solid #f9ab00;"
+        
+        table_rows += f"""
+<tr style="border-bottom: 1px solid #e2e8f0; background: #ffffff; transition: background 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#ffffff'">
+<td style="padding: 16px 24px; font-size: 14px; font-weight: 600; color: #1b1b1b;">{name}</td>
+<td style="padding: 16px 24px; font-size: 14px; color: #2563eb;">{cat}</td>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 14px; color: #1b1b1b; text-align: right;">{alloc_pct:.1f}%</td>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 14px; color: #1b1b1b; text-align: right;">₹{c_val:,.0f}</td>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-weight: 600; font-size: 14px; color: {pnl_color}; text-align: right;">{pnl_sign}{pnl_pct}%</td>
+<td style="padding: 16px 24px; text-align: center;">
+<span style="{status_style} padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; font-family: 'Geist'; text-transform: uppercase; letter-spacing: 0.05em;">{status}</span>
+</td>
+</tr>
+"""
+
+    table_footer = f"""
+</tbody>
+</table>
+<div style="padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+<span style="font-size: 13px; color: #505f76;">Showing {len(portfolio_df)} of {len(portfolio_df)} assets</span>
+<button style="background: transparent; border: none; font-size: 13px; font-weight: 600; color: #1b1b1b; cursor: pointer;">View All</button>
+</div>
+</div>
+"""
+    st.markdown(table_header + table_rows + table_footer, unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PAGE 3 — ANALYTICS (AI Intelligence & Forecasting)
+# ═══════════════════════════════════════════════════════════════════════════════
+elif page == "Analytics":
+
+    # ── Page Header ──
+    st.markdown("""
+<div style="margin-bottom: 24px;">
+<h2 style="font-family: 'Geist'; font-size: 30px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em; margin: 0;">Financial Insights & Analytics</h2>
+<p style="color: #505f76; font-size: 14px; margin-top: 4px; margin-bottom: 0;">Predictive intelligence and performance forecasting</p>
+</div>
+""", unsafe_allow_html=True)
+
+    # ── Top 4 Metric Cards ──
+    an_m1, an_m2, an_m3, an_m4 = st.columns(4)
     
-    with analysis_col1:
-        st.write("**Spend**")
-        st.caption("See exactly where your money goes every day..<br><br>", unsafe_allow_html=True)
+    with an_m1:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; height: 130px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Forecasted Net Worth (6M)</div>
+<div style="font-family: 'Geist'; font-size: 26px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em; margin-bottom: 4px;">₹4,28,45,000</div>
+<div style="display: flex; align-items: center; color: #16a34a; font-size: 12px; font-weight: 600;"><span class="material-symbols-outlined" style="font-size: 16px; margin-right: 4px;">trending_up</span> +12.4% Est.</div>
+</div>
+""", unsafe_allow_html=True)
+
+    with an_m2:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; height: 130px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Savings Potential</div>
+<div style="font-family: 'Geist'; font-size: 26px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em; margin-bottom: 4px;">₹84,200</div>
+<div style="font-size: 12px; color: #505f76;">Available for tax harvesting</div>
+</div>
+""", unsafe_allow_html=True)
+
+    with an_m3:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; height: 130px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Portfolio Risk Score</div>
+<div style="display: flex; align-items: baseline; gap: 4px; margin-bottom: 12px;">
+<div style="font-family: 'Geist'; font-size: 26px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em;">6.8</div>
+<div style="font-size: 14px; color: #505f76; font-weight: 500;">/ 10</div>
+</div>
+<div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden;">
+<div style="width: 68%; height: 100%; background: #f9ab00;"></div>
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+    with an_m4:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; height: 130px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Est. Tax Liability</div>
+<div style="font-family: 'Geist'; font-size: 26px; font-weight: 600; color: #ba1a1a; letter-spacing: -0.02em; margin-bottom: 4px;">₹1,12,500</div>
+<div style="font-size: 12px; color: #ba1a1a; font-weight: 500;">Due in Q4 2026</div>
+</div>
+""", unsafe_allow_html=True)
+
+    st.write("")
+
+    # ── Middle Row: Chart & AI Actions ──
+    mid_col1, mid_col2 = st.columns([7, 5])
+
+    with mid_col1:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px 12px 0 0; padding: 24px 24px 0 24px; border-bottom: none;">
+<div style="display: flex; justify-content: space-between; align-items: center;">
+<h3 style="font-family: 'Geist'; font-size: 18px; font-weight: 600; color: #1b1b1b; margin: 0;">Performance Projection</h3>
+<div style="display: flex; gap: 12px; font-size: 12px; font-weight: 600; color: #505f76;">
+<div style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #2563eb;"></span> Historical</div>
+<div style="display: flex; align-items: center; gap: 4px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #b8c7e2;"></span> Predicted</div>
+</div>
+</div>
+</div>
+""", unsafe_allow_html=True)
+        
+        # Plotly Projection Chart
+        proj_data = pd.DataFrame({
+            "Month": ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG"],
+            "Value": [220, 260, 250, 310, 340, 390, 420, 460],
+            "Type": ["Historical", "Historical", "Historical", "Historical", "Historical", "Predicted", "Predicted", "Predicted"]
+        })
+        
+        fig_proj = px.bar(proj_data, x="Month", y="Value", color="Type", 
+                          color_discrete_map={"Historical": "#2563eb", "Predicted": "#b8c7e2"})
+        
+        # FIXED PLOTLY TICKFONT ERROR HERE
+        fig_proj.update_layout(
+            margin=dict(t=10, b=10, l=10, r=10),
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+            xaxis=dict(showgrid=False, title="", tickfont=dict(color="#1b1b1b", family="Geist", size=11)),
+            yaxis=dict(showgrid=False, showticklabels=False, title="", visible=False),
+            height=300,
+            showlegend=False
+        )
+        fig_proj.update_traces(marker_cornerradius=2)
+        st.plotly_chart(fig_proj, use_container_width=True)
+        
+        st.markdown('<div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px; height: 16px; margin-top: -24px; position: relative; z-index: -1;"></div>', unsafe_allow_html=True)
+
+    with mid_col2:
+        # Pre-calculate data fields for your API payloads
+        total_spend = expenses_df["Amount (₹)"].sum()
+        merchant_spend = expenses_df.groupby("Merchant")["Amount (₹)"].sum()
+        top_merchant = merchant_spend.idxmax() if not merchant_spend.empty else "None"
+        top_merchant_amt = merchant_spend.max() if not merchant_spend.empty else 0
+        food_spend = expenses_df[expenses_df["Category"] == "Food & Dining"]["Amount (₹)"].sum() if "Category" in expenses_df.columns else 0
+        daily_avg = expenses_df["Amount (₹)"].mean()
+        liquid_cash_pool = 45000.00 
+        
+        # 1. Spend AI Block
+        st.markdown("""
+<div style="border: 1px solid #e2e8f0; border-radius: 12px 12px 0 0; padding: 20px; background-color: #ffffff; border-bottom: none;">
+<div style="display: flex; align-items: center; gap: 8px; font-family: 'Geist'; font-weight: 600; font-size: 15px; color: #1b1b1b; margin-bottom: 8px;"><span class="material-symbols-outlined" style="color: #2563eb; font-size: 18px;">auto_awesome</span> Spend</div>
+<div style="font-size: 13px; color: #505f76; line-height: 1.5;">See exactly where your money goes every day.</div>
+</div>
+""", unsafe_allow_html=True)
         if st.button("Analyze Spending", key="btn_spend", type="primary", use_container_width=True):
             with st.spinner("Analyzing consumption velocity logs via Google AI Studio..."):
-                live_insights_text = generate_live_guru_insights(total_spend, top_merchant, top_merchant_amt, food_spend)
-                st.markdown(f"""
-                <div class="insight-box-blue">
-                    <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#2563EB;">Localized Consumption Analysis</span><br><br>
-                    {live_insights_text}
-                </div>
-                """, unsafe_allow_html=True)
-                
-    with analysis_col2:
-        st.write("**Save**")
-        st.caption("Find out how long your current balance will last..<br><br>", unsafe_allow_html=True)
+                # Call connection and save directly to state memory
+                st.session_state.ai_spend_cache = generate_live_guru_insights(total_spend, top_merchant, top_merchant_amt, food_spend)
+        
+        # Keep the results visible on screen even after the script reruns
+        if st.session_state.ai_spend_cache:
+            st.markdown(f"""
+<div class="insight-box-blue" style="margin-top:8px; border-radius:8px; padding:16px; border:1px solid #e2e8f0; border-left:4px solid #2563eb; background:#ffffff;">
+<span style="font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase; font-family:'Geist';">Localized Consumption Analysis</span><br><br>
+<div style="font-size:13px; color:#1b1b1b; line-height:1.5;">{st.session_state.ai_spend_cache}</div>
+</div>
+""", unsafe_allow_html=True)
+
+        st.write("")
+
+        # 2. Save AI Block
+        st.markdown("""
+<div style="border: 1px solid #e2e8f0; border-radius: 12px 12px 0 0; padding: 20px; background-color: #ffffff; border-bottom: none;">
+<div style="display: flex; align-items: center; gap: 8px; font-family: 'Geist'; font-weight: 600; font-size: 15px; color: #1b1b1b; margin-bottom: 8px;"><span class="material-symbols-outlined" style="color: #0ea5e9; font-size: 18px;">show_chart</span> Save</div>
+<div style="font-size: 13px; color: #505f76; line-height: 1.5;">Find out how long your current balance will last.</div>
+</div>
+""", unsafe_allow_html=True)
         if st.button("Check Runway", key="btn_save", type="secondary", use_container_width=True):
             with st.spinner("Computing global predictive financial velocity models..."):
-                from api_connection import generate_global_predictive_runway
-                global_runway_text = generate_global_predictive_runway(total_spend, daily_avg, liquid_cash_pool)
-                st.markdown(f"""
-                <div class="insight-box-green">
-                    <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#16A34A;">Global Liquidity Risk Engine</span><br><br>
-                    {global_runway_text}
-                </div>
-                """, unsafe_allow_html=True)
+                st.session_state.ai_runway_cache = generate_global_predictive_runway(total_spend, daily_avg, liquid_cash_pool)
+        
+        if st.session_state.ai_runway_cache:
+            st.markdown(f"""
+<div class="insight-box-green" style="margin-top:8px; border-radius:8px; padding:16px; border:1px solid #e2e8f0; border-left:4px solid #1e8e3e; background:#ffffff;">
+<span style="font-size:11px; font-weight:700; color:#1e8e3e; text-transform:uppercase; font-family:'Geist';">Global Liquidity Risk Engine</span><br><br>
+<div style="font-size:13px; color:#1b1b1b; line-height:1.5;">{st.session_state.ai_runway_cache}</div>
+</div>
+""", unsafe_allow_html=True)
 
-    with analysis_col3:
-        st.write("**Global**")
-        st.caption("Analyze global currency paths to eliminate hidden transaction costs.")
+        st.write("")
+
+        # 3. Global AI Block
+        st.markdown("""
+<div style="border: 1px solid #e2e8f0; border-radius: 12px 12px 0 0; padding: 20px; background-color: #ffffff; border-bottom: none;">
+<div style="display: flex; align-items: center; gap: 8px; font-family: 'Geist'; font-weight: 600; font-size: 15px; color: #1b1b1b; margin-bottom: 8px;"><span class="material-symbols-outlined" style="color: #8b5cf6; font-size: 18px;">language</span> Global</div>
+<div style="font-size: 13px; color: #505f76; line-height: 1.5;">Analyze global currency paths to eliminate hidden transaction costs.</div>
+</div>
+""", unsafe_allow_html=True)
         if st.button("Optimize Transfer", key="btn_send", type="secondary", use_container_width=True):
             with st.spinner("Executing dynamic cross-border pathway simulations..."):
-                from api_connection import simulate_smart_payout_routing
-                global_routing_text = simulate_smart_payout_routing(1500.00, "USD", "INR")
-                st.markdown(f"""
-                <div class="insight-box">
-                    <span style="font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#D97706;">Smart Payout Routing Engine</span><br><br>
-                    {global_routing_text}
-                </div>
-                """, unsafe_allow_html=True)
+                st.session_state.ai_global_cache = simulate_smart_payout_routing(1500.00, "USD", "INR")
                 
-    st.divider()
+        if st.session_state.ai_global_cache:
+            st.markdown(f"""
+<div class="insight-box" style="margin-top:8px; border-radius:8px; padding:16px; border:1px solid #e2e8f0; border-left:4px solid #f9ab00; background:#ffffff;">
+<span style="font-size:11px; font-weight:700; color:#f9ab00; text-transform:uppercase; font-family:'Geist';">Smart Payout Routing Engine</span><br><br>
+<div style="font-size:13px; color:#1b1b1b; line-height:1.5;">{st.session_state.ai_global_cache}</div>
+</div>
+""", unsafe_allow_html=True)
 
-    # ── Insight generator (Original Static Analytics Undisturbed) ────────────────
-    def generate_insights(exp_df: pd.DataFrame, port_df: pd.DataFrame) -> list[dict]:
-        """
-        Analyse expense + portfolio data and produce actionable financial insights.
-        Returns a list of dicts with keys: icon, style, title, body.
-        """
-        insights: list[dict] = []
+    # ── Bottom Row: Action Center & Growth Metrics ──
+    bot_col1, bot_col2 = st.columns([4, 8])
 
-        # ─ Insight 1: Top merchant spend ──────────────────────────────────────
-        merchant_spend_loc = exp_df.groupby("Merchant")["Amount (₹)"].sum()
-        top_merchant_loc = merchant_spend_loc.idxmax()
-        top_merchant_amt_loc = merchant_spend_loc.max()
+    with bot_col1:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 100%;">
+<h3 style="font-family: 'Geist'; font-size: 16px; font-weight: 600; color: #1b1b1b; margin-top: 0; margin-bottom: 20px;">Action Center</h3>
+<div style="display: flex; flex-direction: column; gap: 16px;">
 
-        # Estimate potential MF returns (12% CAGR over 5 years)
-        redirect_pct = 0.20
-        redirect_amt = top_merchant_amt_loc * redirect_pct
-        future_value = redirect_amt * ((1 + 0.12) ** 5)
+<div style="display: flex; gap: 16px; align-items: flex-start; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px;">
+<div style="width: 32px; height: 32px; border-radius: 50%; background: #eff6ff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><span class="material-symbols-outlined" style="color: #2563eb; font-size: 16px;">lightbulb</span></div>
+<div>
+<div style="font-family: 'Geist'; font-size: 14px; font-weight: 600; color: #1b1b1b; margin-bottom: 2px;">Harvest Losses</div>
+<div style="font-size: 12px; color: #505f76; line-height: 1.4;">Offset ₹12k capital gains by selling underperforming assets.</div>
+</div>
+</div>
 
-        insights.append({
-            "icon": "",
-            "style": "insight-box",
-            "title": "Shopping Pattern Detected",
-            "body": (
-                f"You've spent <strong>₹{top_merchant_amt_loc:,.0f}</strong> on "
-                f"<strong>{top_merchant_loc}</strong> over the last 30 days. "
-                f"Redirecting just 20% (₹{redirect_amt:,.0f}/month) into a "
-                f"mutual fund with ~12% CAGR could grow to "
-                f"<strong>₹{future_value:,.0f}</strong> in 5 years."
-            ),
-        })
+<div style="display: flex; gap: 16px; align-items: flex-start; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px;">
+<div style="width: 32px; height: 32px; border-radius: 50%; background: #fefce8; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><span class="material-symbols-outlined" style="color: #f9ab00; font-size: 16px;">tune</span></div>
+<div>
+<div style="font-family: 'Geist'; font-size: 14px; font-weight: 600; color: #1b1b1b; margin-bottom: 2px;">Rebalance Small-Cap</div>
+<div style="font-size: 12px; color: #505f76; line-height: 1.4;">Exposure is 15% above target. Move surplus to Liquid Funds.</div>
+</div>
+</div>
 
-        # ─ Insight 2: Food delivery overspend ────────────────────────────────
-        food_spend_loc = exp_df[exp_df["Category"] == "Food & Dining"]["Amount (₹)"].sum()
-        daily_food_avg = food_spend_loc / 30
+<div style="display: flex; gap: 16px; align-items: flex-start; padding: 16px; border: 1px solid #e2e8f0; border-radius: 8px;">
+<div style="width: 32px; height: 32px; border-radius: 50%; background: #f0fdf4; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"><span class="material-symbols-outlined" style="color: #16a34a; font-size: 16px;">verified</span></div>
+<div>
+<div style="font-family: 'Geist'; font-size: 14px; font-weight: 600; color: #1b1b1b; margin-bottom: 2px;">Step-Up SIP</div>
+<div style="font-size: 12px; color: #505f76; line-height: 1.4;">Increase Zerodha SIPs by 10% to meet retirement goal 1yr early.</div>
+</div>
+</div>
 
-        insights.append({
-            "icon": "",
-            "style": "insight-box-blue",
-            "title": "Food Delivery Spend Alert",
-            "body": (
-                f"Your monthly food delivery spend is "
-                f"<strong>₹{food_spend_loc:,.0f}</strong> "
-                f"(~₹{daily_food_avg:,.0f}/day). "
-                f"Cooking at home 3 days a week could save you approximately "
-                f"<strong>₹{daily_food_avg * 3 * 4:,.0f}</strong> per month — "
-                f"that's enough to cover a Netflix + Spotify subscription and "
-                f"still save."
-            ),
-        })
+</div>
+</div>
+""", unsafe_allow_html=True)
 
-        # ─ Insight 3: Portfolio health ────────────────────────────────────────
-        best_asset = port_df.loc[port_df["Returns (%)"].idxmax()]
-        worst_asset = port_df.loc[port_df["Returns (%)"].idxmin()]
+    with bot_col2:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; height: 100%; display: flex; flex-direction: column;">
+<div style="padding: 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+<h3 style="font-family: 'Geist'; font-size: 16px; font-weight: 600; color: #1b1b1b; margin: 0;">Growth Metrics per Asset</h3>
+<span class="material-symbols-outlined" style="color: #1b1b1b; font-size: 20px; cursor: pointer;">filter_list</span>
+</div>
+<table style="width: 100%; border-collapse: collapse; text-align: left;">
+<thead>
+<tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+<th style="padding: 16px 24px; font-family: 'Geist'; font-size: 10px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em;">Asset Class</th>
+<th style="padding: 16px 24px; font-family: 'Geist'; font-size: 10px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Current Value</th>
+<th style="padding: 16px 24px; font-family: 'Geist'; font-size: 10px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">CAGR (3Y)</th>
+<th style="padding: 16px 24px; font-family: 'Geist'; font-size: 10px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; text-align: center;">Status</th>
+</tr>
+</thead>
+<tbody>
+<tr style="border-bottom: 1px solid #e2e8f0;">
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 13px; font-weight: 600; color: #1b1b1b;">Mutual Funds (Zerodha)</td>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 13px; font-weight: 500; color: #1b1b1b; text-align: right;">₹1,44,45,000</td>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 14px; font-weight: 700; color: #16a34a; text-align: right;">+18.4%</td>
+<td style="padding: 16px 24px; text-align: center;"><span style="border: 1px solid #16a34a; color: #16a34a; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Bullish</span></td>
+</tr>
+<tr style="border-bottom: 1px solid #e2e8f0;">
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 13px; font-weight: 600; color: #1b1b1b;">Equity Stocks (Upstox)</td>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 13px; font-weight: 500; color: #1b1b1b; text-align: right;">₹92,12,000</td>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 14px; font-weight: 700; color: #16a34a; text-align: right;">+24.1%</td>
+<td style="padding: 16px 24px; text-align: center;"><span style="border: 1px solid #f9ab00; color: #f9ab00; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Volatile</span></td>
+</tr>
+<tr style="border-bottom: 1px solid #e2e8f0;">
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 13px; font-weight: 600; color: #1b1b1b;">Fixed Deposits (SBI/HDFC)</td>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 13px; font-weight: 500; color: #1b1b1b; text-align: right;">₹38,50,000</td>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 14px; font-weight: 700; color: #505f76; text-align: right;">+7.1%</td>
+<td style="padding: 16px 24px; text-align: center;"><span style="border: 1px solid #505f76; color: #505f76; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Settled</span></td>
+</tr>
+<tr>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 13px; font-weight: 600; color: #1b1b1b;">Digital Assets (Gold/Crypto)</td>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 13px; font-weight: 500; color: #1b1b1b; text-align: right;">₹12,45,000</td>
+<td style="padding: 16px 24px; font-family: 'Geist'; font-size: 14px; font-weight: 700; color: #ba1a1a; text-align: right;">-2.4%</td>
+<td style="padding: 16px 24px; text-align: center;"><span style="border: 1px solid #ba1a1a; color: #ba1a1a; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Critical</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+""", unsafe_allow_html=True)
 
-        insights.append({
-            "icon": "",
-            "style": "insight-box-green",
-            "title": "Portfolio Health Check",
-            "body": (
-                f"Your best performer is <strong>{best_asset['Asset']}</strong> "
-                f"at <strong>+{best_asset['Returns (%)']:.1f}%</strong>. "
-                f"Your weakest holding — <strong>{worst_asset['Asset']}</strong> — "
-                f"is at <strong>+{worst_asset['Returns (%)']:.1f}%</strong>. "
-                f"Consider rebalancing: shift partial profits from the top "
-                f"performer into a diversified index fund to lock gains and "
-                f"reduce concentration risk."
-            ),
-        })
+# ═══════════════════════════════════════════════════════════════════════════════
+# PAGE 4 — LEDGER
+# ═══════════════════════════════════════════════════════════════════════════════
+elif page == "Ledger":
+    
+    st.markdown("""
+<div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;">
+<div>
+<h2 style="font-family: 'Geist'; font-size: 30px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em; margin: 0;">Transaction Ledger</h2>
+<p style="color: #505f76; font-size: 14px; margin-top: 4px; margin-bottom: 0;">Historical records and audit trails</p>
+</div>
+<div style="display: flex; gap: 12px;">
+<button style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; font-family: 'Geist'; font-weight: 600; font-size: 13px; color: #1b1b1b; cursor: pointer;"><span class="material-symbols-outlined" style="font-size: 18px;">filter_list</span> Filter</button>
+<button style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #000000; border: 1px solid #000000; border-radius: 8px; font-family: 'Geist'; font-weight: 600; font-size: 13px; color: #ffffff; cursor: pointer;"><span class="material-symbols-outlined" style="font-size: 18px;">download</span> Export CSV</button>
+</div>
+</div>
+""", unsafe_allow_html=True)
 
-        # ─ Insight 4: Bill optimization ───────────────────────────────────────
-        bills_spend = exp_df[exp_df["Category"] == "Bills & Utilities"]["Amount (₹)"].sum()
-        transport_spend = exp_df[exp_df["Category"] == "Transport"]["Amount (₹)"].sum()
+    l_col1, l_col2, l_col3, l_col4 = st.columns(4)
+    
+    with l_col1:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 140px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Total Volume</div>
+<div style="font-family: 'Geist'; font-size: 28px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em; margin-bottom: 4px;">$2,842,910.42</div>
+<div style="font-size: 13px; color: #505f76;">Across 1,248 entries</div>
+</div>
+""", unsafe_allow_html=True)
+        
+    with l_col2:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 140px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Net Cash Flow</div>
+<div style="font-family: 'Geist'; font-size: 28px; font-weight: 600; color: #1e8e3e; letter-spacing: -0.02em; margin-bottom: 4px;">+$142,300.00</div>
+<div style="display: flex; align-items: center; color: #16a34a; font-size: 13px; font-weight: 500;"><span class="material-symbols-outlined" style="font-size: 16px; margin-right: 4px;">trending_up</span> 12.4% vs last month</div>
+</div>
+""", unsafe_allow_html=True)
+        
+    with l_col3:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 140px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Settled Ratio</div>
+<div style="font-family: 'Geist'; font-size: 28px; font-weight: 600; color: #1b1b1b; letter-spacing: -0.02em; margin-bottom: 16px;">98.2%</div>
+<div style="width: 100%; height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden;">
+<div style="width: 98.2%; height: 100%; background: #2563eb;"></div>
+</div>
+</div>
+""", unsafe_allow_html=True)
+        
+    with l_col4:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 140px; display: flex; flex-direction: column; justify-content: center;">
+<div style="font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Pending Clearances</div>
+<div style="font-family: 'Geist'; font-size: 28px; font-weight: 600; color: #f9ab00; letter-spacing: -0.02em; margin-bottom: 4px;">14 Items</div>
+<div style="font-size: 13px; color: #505f76;">$12,400.00 at risk</div>
+</div>
+""", unsafe_allow_html=True)
 
-        insights.append({
-            "icon": "",
-            "style": "insight-box",
-            "title": "Bills & Transport Optimisation",
-            "body": (
-                f"You've spent <strong>₹{bills_spend:,.0f}</strong> on bills and "
-                f"<strong>₹{transport_spend:,.0f}</strong> on transport this month. "
-                f"Switching to annual plans for OTT subscriptions and leveraging "
-                f"UPI cashback offers on recharges could save 8—12% on recurring bills. "
-                f"For transport, carpooling 2 days/week saves ~₹{transport_spend * 0.3:,.0f}."
-            ),
-        })
+    st.write("")
 
-        # ─ Insight 5: Emergency fund check ────────────────────────────────────
-        monthly_spend = exp_df["Amount (₹)"].sum()
-        recommended_emergency = monthly_spend * 6
+    table_header = """
+<div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-top: 24px;">
+<div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; gap: 16px;">
+<button style="background: #ffffff; border: 1px solid #e2e8f0; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #1b1b1b; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">Current Month</button>
+<button style="background: transparent; border: 1px solid transparent; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; color: #505f76;">All Types</button>
+<span style="margin-left: auto; font-size: 13px; color: #505f76; align-self: center;">Showing 1-10 of 1,248 transactions</span>
+</div>
+<table style="width: 100%; border-collapse: collapse; text-align: left;">
+<thead>
+<tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+<th style="padding: 14px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em;">Timestamp</th>
+<th style="padding: 14px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em;">Counterparty / Description</th>
+<th style="padding: 14px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em;">Category</th>
+<th style="padding: 14px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em;">Account</th>
+<th style="padding: 14px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; text-align: right;">Amount</th>
+<th style="padding: 14px 24px; font-family: 'Geist'; font-size: 11px; font-weight: 700; color: #505f76; text-transform: uppercase; letter-spacing: 0.05em; text-align: center;">Status</th>
+</tr>
+</thead>
+<tbody>
+"""
+    
+    table_rows = ""
+    for idx, row in expenses_df.head(6).iterrows():
+        date_str = row['Date'].strftime("%Y-%m-%d %H:%M")
+        merchant = row['Merchant']
+        category = row['Category']
+        amount = row['Amount (₹)']
+        
+        account = random.choice(["MAIN-OP-001", "LO-X-242", "DC-SV-99", "TR-ASSET-71", "CLOUD-222"])
+        status = random.choice(["SETTLED", "PENDING", "RECONCILED", "SETTLED"])
+        
+        if status == "SETTLED":
+            status_style = "color: #1e8e3e; border: 1px solid #1e8e3e;"
+        elif status == "PENDING":
+            status_style = "color: #f9ab00; border: 1px solid #f9ab00;"
+        else:
+            status_style = "color: #2563eb; border: 1px solid #2563eb;"
+            
+        amt_color = "#ba1a1a" if amount > 500 else "#1e8e3e"
+        amt_sign = "-" if amount > 500 else "+"
+        
+        table_rows += f"""
+<tr style="border-bottom: 1px solid #e2e8f0; background: #ffffff; transition: background 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#ffffff'">
+<td style="padding: 16px 24px; font-size: 13px; color: #505f76; width: 15%;">{date_str}</td>
+<td style="padding: 16px 24px; width: 30%;">
+<div style="font-weight: 600; color: #1b1b1b; font-size: 14px; margin-bottom: 2px;">{merchant}</div>
+<div style="font-size: 12px; color: #505f76;">Platform transaction execution</div>
+</td>
+<td style="padding: 16px 24px; width: 15%;">
+<span style="border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 12px; color: #505f76;">{category}</span>
+</td>
+<td style="padding: 16px 24px; font-size: 13px; color: #505f76; width: 15%;">{account}</td>
+<td style="padding: 16px 24px; text-align: right; font-family: 'Geist'; font-weight: 600; font-size: 14px; color: {amt_color}; width: 15%;">{amt_sign}₹{amount:,.2f}</td>
+<td style="padding: 16px 24px; text-align: center; width: 10%;">
+<span style="{status_style} padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; font-family: 'Geist'; text-transform: uppercase; letter-spacing: 0.05em;">{status}</span>
+</td>
+</tr>
+"""
 
-        insights.append({
-            "icon": "",
-            "style": "insight-box-blue",
-            "title": "Emergency Fund Recommendation",
-            "body": (
-                f"With monthly expenses around <strong>₹{monthly_spend:,.0f}</strong>, "
-                f"your ideal emergency fund should be at least "
-                f"<strong>₹{recommended_emergency:,.0f}</strong> (6 months' cover). "
-                f"Park this in a liquid fund or high-yield savings account for "
-                f"instant access with better returns than a regular savings a/c."
-            ),
-        })
+    table_footer = """
+</tbody>
+</table>
+<div style="padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e2e8f0; background: #ffffff;">
+<button style="border: 1px solid #e2e8f0; background: #ffffff; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; color: #505f76; cursor: pointer;">Previous</button>
+<div style="display: flex; gap: 12px; font-size: 13px; font-weight: 600;">
+<span style="background: #000000; color: #ffffff; padding: 4px 10px; border-radius: 4px;">1</span>
+<span style="padding: 4px 10px; color: #1b1b1b; cursor: pointer;">2</span>
+<span style="padding: 4px 10px; color: #1b1b1b; cursor: pointer;">3</span>
+<span style="padding: 4px 10px; color: #505f76;">...</span>
+<span style="padding: 4px 10px; color: #1b1b1b; cursor: pointer;">125</span>
+</div>
+<button style="border: 1px solid #e2e8f0; background: #ffffff; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; color: #1b1b1b; cursor: pointer;">Next</button>
+</div>
+</div>
+"""
+    
+    st.markdown(table_header + table_rows + table_footer, unsafe_allow_html=True)
 
-        return insights
+    st.write("")
+    
+    bot_col1, bot_col2 = st.columns(2)
+    
+    with bot_col1:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 220px; display: flex; flex-direction: column;">
+<h3 style="font-family: 'Geist'; font-size: 18px; font-weight: 600; color: #1b1b1b; margin-top: 0; margin-bottom: 24px;">Volume Distribution</h3>
+<div style="display: flex; align-items: flex-end; gap: 12px; flex-grow: 1;">
+<div style="background: #d4e3ff; width: 100%; height: 40%; border-radius: 2px 2px 0 0;"></div>
+<div style="background: #d4e3ff; width: 100%; height: 70%; border-radius: 2px 2px 0 0;"></div>
+<div style="background: #d4e3ff; width: 100%; height: 30%; border-radius: 2px 2px 0 0;"></div>
+<div style="background: #d4e3ff; width: 100%; height: 90%; border-radius: 2px 2px 0 0;"></div>
+<div style="background: #2563eb; width: 100%; height: 100%; border-radius: 2px 2px 0 0;"></div>
+</div>
+</div>
+""", unsafe_allow_html=True)
+        
+    with bot_col2:
+        st.markdown("""
+<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; height: 220px; position: relative; overflow: hidden;">
+<h3 style="font-family: 'Geist'; font-size: 18px; font-weight: 600; color: #1b1b1b; margin-top: 0; margin-bottom: 8px;">Audit Compliance</h3>
+<p style="color: #505f76; font-size: 13px; margin-bottom: 24px;">Integrity check completed 4 hours ago.</p>
+<div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; display: flex; align-items: flex-start; gap: 12px;">
+<span class="material-symbols-outlined" style="color: #16a34a; font-size: 24px;">verified_user</span>
+<div>
+<div style="font-family: 'Geist'; font-weight: 600; font-size: 14px; color: #1b1b1b; margin-bottom: 2px;">Checksum Validated</div>
+<div style="font-size: 13px; color: #505f76;">All 12.4k ledger entries match chain hash.</div>
+</div>
+</div>
+</div>
+""", unsafe_allow_html=True)
 
-    # ── Render insights ───────────────────────────────────────────────────────
-    insights = generate_insights(expenses_df, portfolio_df)
-
-    for insight in insights:
-        st.markdown(
-            f'<div class="{insight["style"]}">'
-            f'<strong>{insight["title"]}</strong><br><br>'
-            f'{insight["body"]}'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-
-    st.divider()
-
-    # ── Spending heatmap / category breakdown ─────────────────────────────────
-    st.markdown("##### Expense Breakdown — Behind The Numbers")
-
-    cat_summary = (
-        expenses_df.groupby("Category")["Amount (₹)"]
-        .agg(["sum", "count", "mean"])
-        .reset_index()
-    )
-    cat_summary.columns = ["Category", "Total (₹)", "Transactions", "Avg per Txn (₹)"]
-    cat_summary = cat_summary.sort_values("Total (₹)", ascending=False)
-    cat_summary["Total (₹)"] = cat_summary["Total (₹)"].apply(lambda x: f"₹{x:,.0f}")
-    cat_summary["Avg per Txn (₹)"] = cat_summary["Avg per Txn (₹)"].apply(lambda x: f"₹{x:,.0f}")
-
-    st.dataframe(cat_summary, use_container_width=True, hide_index=True)
-
-    # ── Merchant-level bar chart ──────────────────────────────────────────────
-    st.markdown("##### Top 10 Merchants by Spend")
-    merchant_agg = (
-        expenses_df.groupby("Merchant")["Amount (₹)"]
-        .sum()
-        .reset_index()
-        .sort_values("Amount (₹)", ascending=True)
-        .tail(10)
-    )
-    fig_merchant = px.bar(
-        merchant_agg,
-        x="Amount (₹)",
-        y="Merchant",
-        orientation="h",
-        color_discrete_sequence=["#2563EB"],
-    )
-    fig_merchant.update_layout(
-        margin=dict(t=10, b=10, l=10, r=10),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(showgrid=True, gridcolor="#F1F5F9", title="₹"),
-        yaxis=dict(showgrid=False, title=""),
-        font=dict(family="Inter", color="#334155"),
-        height=380,
-    )
-    fig_merchant.update_traces(
-        hovertemplate="<b>%{y}</b><br>₹%{x:,.0f}<extra></extra>",
-        marker_cornerradius=6,
-    )
-    st.plotly_chart(fig_merchant, use_container_width=True)
-
-
-# ─── Global footer ─────────────────────────────────────────────────────────────
-st.markdown(
-    '<div class="footer">'
-    "Hisaab Kitaab v1.0 — A personal finance demo dashboard. "
-    "Data shown is simulated and for demonstration purposes only."
-    "</div>",
-    unsafe_allow_html=True,
-)
