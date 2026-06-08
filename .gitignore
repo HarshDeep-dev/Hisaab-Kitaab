@@ -1,5 +1,11 @@
+# Python Environment files
 .env
 __pycache__/
 *.pyc
 .streamlit/.env
 .env
+
+
+# Google API Authentication Secrets
+credentials.json
+token.json
